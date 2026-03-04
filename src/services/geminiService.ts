@@ -6,15 +6,14 @@ const getApiKey = (type: 'gemini' | 'veo' = 'gemini') => {
   const manualVeoKey = typeof window !== 'undefined' ? localStorage.getItem('manual_veo_api_key') : null;
   
   // Priority: 
-  // 1. Manual key for specific type
-  // 2. Platform selected key (process.env.API_KEY)
-  // 3. Manual general key
-  // 4. Default environment key
+  // 1. Manual key for specific type (entered in text fields)
+  // 2. Platform selected key (selected via "Chọn API Key từ Project")
+  // We EXPLICITLY remove process.env.GEMINI_API_KEY to avoid "passive" usage.
   
   if (type === 'veo') {
-    return manualVeoKey || process.env.API_KEY || manualGeminiKey || process.env.GEMINI_API_KEY || "";
+    return manualVeoKey || process.env.API_KEY || "";
   }
-  return manualGeminiKey || process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+  return manualGeminiKey || process.env.API_KEY || "";
 };
 
 const getAiInstance = (type: 'gemini' | 'veo' = 'gemini') => {
@@ -135,7 +134,7 @@ export async function generateAdScript(
   tone: Tone,
   brandVoice: boolean
 ): Promise<AdSegment[]> {
-  const model = "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
   
   const systemInstruction = `You are an expert short-form ad script writer. 
   Generate a high-converting ad script split into 8-second segments.
@@ -257,7 +256,7 @@ export async function generateAdScript(
 }
 
 export async function generateCharacterProfile(product: ProductInfo): Promise<string> {
-  const model = "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
   const prompt = `Based on this product and target audience, create a detailed visual description of a recurring character or mascot for the ad campaign to ensure visual consistency. 
   Product: ${product.name}
   Audience: ${product.audienceDesc}
@@ -299,7 +298,7 @@ export async function generateImagePrompts(
   characterProfile: string,
   productName: string
 ): Promise<string[]> {
-  const model = "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
   const prompt = `For each of the following ad segments, generate a high-quality, detailed image generation prompt. 
   
   CRITICAL: Visual Consistency
@@ -382,7 +381,7 @@ export async function generateVideoPrompts(
   characterProfile: string,
   productName: string
 ): Promise<string[]> {
-  const model = "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
   const prompt = `For each of the following ad segments, generate a high-quality video generation prompt for Veo 3. 
   
   CRITICAL: Visual Consistency & Motion
@@ -427,7 +426,7 @@ export async function generateVideo(
   };
 
   const payload: any = {
-    model: 'veo-3.1-fast-generate-preview',
+    model: typeof window !== 'undefined' ? localStorage.getItem('selected_veo_model') || 'veo-3.1-fast-generate-preview' : 'veo-3.1-fast-generate-preview',
     prompt,
     config
   };
@@ -501,7 +500,7 @@ export async function generateVideo(
 }
 
 export async function analyzeVideo(videoBase64: string, mimeType: string): Promise<Partial<AdScript>> {
-  const model = "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
   const prompt = `Analyze this advertisement video and extract the following information in JSON format:
   1. Product Name and Category
   2. Target Audience and Pain Points addressed
