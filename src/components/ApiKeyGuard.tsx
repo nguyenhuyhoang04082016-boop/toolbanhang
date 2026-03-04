@@ -9,6 +9,8 @@ interface ApiKeyGuardProps {
 export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => void }> = ({ onSave, onCancel }) => {
   const [geminiKey, setGeminiKey] = useState<string>(localStorage.getItem('manual_gemini_api_key') || '');
   const [veoKey, setVeoKey] = useState<string>(localStorage.getItem('manual_veo_api_key') || '');
+  const [geminiModel, setGeminiModel] = useState<string>(localStorage.getItem('selected_gemini_model') || 'gemini-3-flash-preview');
+  const [veoModel, setVeoModel] = useState<string>(localStorage.getItem('selected_veo_model') || 'veo-3.1-fast-generate-preview');
 
   const handleSelectKey = async () => {
     if (window.aistudio) {
@@ -24,14 +26,20 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
     if (veoKey.trim()) {
       localStorage.setItem('manual_veo_api_key', veoKey.trim());
     }
+    localStorage.setItem('selected_gemini_model', geminiModel);
+    localStorage.setItem('selected_veo_model', veoModel);
     onSave();
   };
 
   const handleClearKeys = () => {
     localStorage.removeItem('manual_gemini_api_key');
     localStorage.removeItem('manual_veo_api_key');
+    localStorage.removeItem('selected_gemini_model');
+    localStorage.removeItem('selected_veo_model');
     setGeminiKey('');
     setVeoKey('');
+    setGeminiModel('gemini-3-flash-preview');
+    setVeoModel('veo-3.1-fast-generate-preview');
     onSave();
   };
 
@@ -73,6 +81,19 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
             </div>
 
             <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Phiên bản Gemini</label>
+              <select
+                value={geminiModel}
+                onChange={(e) => setGeminiModel(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="gemini-3-flash-preview">Gemini 3 Flash (Nhanh, Hiệu quả)</option>
+                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Thông minh, Chậm hơn)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Ổn định)</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Veo API Key (Video)</label>
               <input
                 type="password"
@@ -81,6 +102,18 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
                 placeholder="Dán Veo API Key (AIZA...) vào đây..."
                 className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Phiên bản Veo</label>
+              <select
+                value={veoModel}
+                onChange={(e) => setVeoModel(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast (Tốc độ)</option>
+                <option value="veo-3.1-generate-preview">Veo 3.1 High Quality (Chất lượng cao)</option>
+              </select>
             </div>
 
             <div className="flex gap-2 pt-2">
