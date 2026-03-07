@@ -50,14 +50,14 @@ export default function App() {
       }
     }
 
-    const savedCurrentScript = localStorage.getItem('current_adscript');
-    if (savedCurrentScript) {
-      try {
-        setCurrentScript(JSON.parse(savedCurrentScript));
-      } catch (e) {
-        console.error('Failed to parse current script', e);
-      }
-    }
+   const savedCurrentScript = sessionStorage.getItem('current_adscript');
+if (savedCurrentScript) {
+  try {
+    setCurrentScript(JSON.parse(savedCurrentScript));
+  } catch (e) {
+    console.error('Failed to parse current script', e);
+  }
+}
     
     // Check dark mode preference
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -67,20 +67,41 @@ export default function App() {
 
   // Sync current script to local storage
   useEffect(() => {
-    if (currentScript) {
-      localStorage.setItem('current_adscript', JSON.stringify(currentScript));
-    }
-  }, [currentScript]);
+  if (!currentScript) return;
+
+  try {
+    sessionStorage.setItem(
+      'current_adscript',
+      JSON.stringify(currentScript)
+    );
+  } catch (e) {
+    console.error('Failed to save current script', e);
+  }
+}, [currentScript]);
 
   // Sync history to local storage
-  useEffect(() => {
-    localStorage.setItem('adscript_history', JSON.stringify(history.slice(0, 5)));
-  }, [history]);
+ useEffect(() => {
+  try {
+    localStorage.setItem(
+      'adscript_history',
+      JSON.stringify(history.slice(0, 3))
+    );
+  } catch (e) {
+    console.error('Failed to save history', e);
+  }
+}, [history]);
 
   // Sync templates to local storage
   useEffect(() => {
-    localStorage.setItem('adscript_templates', JSON.stringify(savedTemplates));
-  }, [savedTemplates]);
+  try {
+    localStorage.setItem(
+      'adscript_templates',
+      JSON.stringify(savedTemplates.slice(0, 20))
+    );
+  } catch (e) {
+    console.error('Failed to save templates', e);
+  }
+}, [savedTemplates]);
 
   // Apply dark mode class
   useEffect(() => {
