@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ProductInfo, Platform, VideoRatio, HookStyle, CTAType, VoiceoverStyle, VoiceoverSpeed } from '../types';
+import { ProductInfo, Platform, VideoRatio, HookStyle, CTAType, VoiceoverStyle, VoiceoverSpeed, Language } from '../types';
 import { Info, Plus, X, AlertCircle, Sparkles, Save, Upload, Image as ImageIcon } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface ProductFormProps {
   onSubmit: (data: ProductInfo) => void;
   onSaveTemplate: (data: ProductInfo) => void;
   isLoading: boolean;
   initialValue?: ProductInfo | null;
+  language: Language;
 }
 
 const initialData: ProductInfo = {
@@ -29,15 +31,20 @@ const initialData: ProductInfo = {
   ctaType: 'buy now',
   voiceoverStyle: 'neutral',
   voiceoverSpeed: 'normal',
+  hasVoiceover: true,
   onScreenText: true,
 };
 
-const benefitOptions = ['Tiết kiệm thời gian', 'Tiết kiệm chi phí', 'Chất lượng cao', 'Thân thiện môi trường', 'Dễ sử dụng', 'Sáng tạo'];
+const benefitOptionsVi = ['Tiết kiệm thời gian', 'Tiết kiệm chi phí', 'Chất lượng cao', 'Thân thiện môi trường', 'Dễ sử dụng', 'Sáng tạo'];
+const benefitOptionsEn = ['Time-saving', 'Cost-saving', 'High quality', 'Eco-friendly', 'Easy to use', 'Creative'];
 
-export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTemplate, isLoading, initialValue }) => {
+export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTemplate, isLoading, initialValue, language }) => {
   const [formData, setFormData] = useState<ProductInfo>(initialData);
+  const { t } = useTranslation(language);
   const [featureInput, setFeatureInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const benefitOptions = language === 'vi' ? benefitOptionsVi : benefitOptionsEn;
 
   useEffect(() => {
     if (initialValue) {
@@ -47,14 +54,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name) newErrors.name = 'Tên sản phẩm là bắt buộc';
-    if (!formData.category) newErrors.category = 'Danh mục là bắt buộc';
-    if (!formData.targetUser) newErrors.targetUser = 'Đối tượng mục tiêu là bắt buộc';
-    if (formData.benefits.length === 0 && !formData.customBenefit) newErrors.benefits = 'Cần ít nhất một lợi ích';
-    if (formData.features.length === 0) newErrors.features = 'Cần ít nhất một tính năng';
-    if (!formData.audienceDesc) newErrors.audienceDesc = 'Mô tả khán giả là bắt buộc';
-    if (!formData.painPoint) newErrors.painPoint = 'Nỗi đau chính là bắt buộc';
-    if (formData.price < 0) newErrors.price = 'Giá phải lớn hơn hoặc bằng 0';
+    if (!formData.name) newErrors.name = language === 'vi' ? 'Tên sản phẩm là bắt buộc' : 'Product name is required';
+    if (!formData.category) newErrors.category = language === 'vi' ? 'Danh mục là bắt buộc' : 'Category is required';
+    if (!formData.targetUser) newErrors.targetUser = language === 'vi' ? 'Đối tượng mục tiêu là bắt buộc' : 'Target user is required';
+    if (formData.benefits.length === 0 && !formData.customBenefit) newErrors.benefits = language === 'vi' ? 'Cần ít nhất một lợi ích' : 'At least one benefit is required';
+    if (formData.features.length === 0) newErrors.features = language === 'vi' ? 'Cần ít nhất một tính năng' : 'At least one feature is required';
+    if (!formData.audienceDesc) newErrors.audienceDesc = language === 'vi' ? 'Mô tả khán giả là bắt buộc' : 'Audience description is required';
+    if (!formData.painPoint) newErrors.painPoint = language === 'vi' ? 'Nỗi đau chính là bắt buộc' : 'Main pain point is required';
+    if (formData.price < 0) newErrors.price = language === 'vi' ? 'Giá phải lớn hơn hoặc bằng 0' : 'Price must be greater than or equal to 0';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -90,31 +97,61 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
   };
 
   const fillSample = () => {
-    setFormData({
-      name: 'Máy cho thú cưng ăn tự động PetPurr',
-      category: 'Phụ kiện thú cưng',
-      targetUser: 'Chủ nuôi bận rộn',
-      benefits: ['Tiết kiệm thời gian', 'Dễ sử dụng'],
-      customBenefit: 'Đảm bảo thú cưng được ăn đúng giờ ngay cả khi bạn về muộn.',
-      features: ['Điều khiển qua App', 'Ghi âm giọng nói', 'Dung tích 10L', 'Pin dự phòng'],
-      price: 89.99,
-      currency: 'USD',
-      audienceDesc: 'Những người trẻ bận rộn đi làm cả ngày và lo lắng cho thú cưng ở nhà.',
-      painPoint: 'Lịch ăn uống không đều đặn khiến thú cưng lo lắng.',
-      emotion: 'An tâm',
-      positioning: 'premium',
-      platform: 'TikTok',
-      ratio: '9:16',
-      totalLength: 32,
-      hookStyle: 'problem-solution',
-      ctaType: 'buy now',
-      voiceoverStyle: 'female',
-      voiceoverSpeed: 'normal',
-      onScreenText: true,
-      brandName: 'PetPurr',
-      brandSlogan: 'Chăm sóc thông minh cho thú cưng hạnh phúc',
-      musicVibe: 'Chill lo-fi beats',
-    });
+    if (language === 'vi') {
+      setFormData({
+        name: 'Máy cho thú cưng ăn tự động PetPurr',
+        category: 'Phụ kiện thú cưng',
+        targetUser: 'Chủ nuôi bận rộn',
+        benefits: ['Tiết kiệm thời gian', 'Dễ sử dụng'],
+        customBenefit: 'Đảm bảo thú cưng được ăn đúng giờ ngay cả khi bạn về muộn.',
+        features: ['Điều khiển qua App', 'Ghi âm giọng nói', 'Dung tích 10L', 'Pin dự phòng'],
+        price: 89.99,
+        currency: 'USD',
+        audienceDesc: 'Những người trẻ bận rộn đi làm cả ngày và lo lắng cho thú cưng ở nhà.',
+        painPoint: 'Lịch ăn uống không đều đặn khiến thú cưng lo lắng.',
+        emotion: 'An tâm',
+        positioning: 'premium',
+        platform: 'TikTok',
+        ratio: '9:16',
+        totalLength: 32,
+        hookStyle: 'problem-solution',
+        ctaType: 'buy now',
+        voiceoverStyle: 'female',
+        voiceoverSpeed: 'normal',
+        hasVoiceover: true,
+        onScreenText: true,
+        brandName: 'PetPurr',
+        brandSlogan: 'Chăm sóc thông minh cho thú cưng hạnh phúc',
+        musicVibe: 'Chill lo-fi beats',
+      });
+    } else {
+      setFormData({
+        name: 'PetPurr Automatic Pet Feeder',
+        category: 'Pet Accessories',
+        targetUser: 'Busy pet owners',
+        benefits: ['Time-saving', 'Easy to use'],
+        customBenefit: 'Ensures pets are fed on time even when you are late.',
+        features: ['App Control', 'Voice Recording', '10L Capacity', 'Backup Battery'],
+        price: 89.99,
+        currency: 'USD',
+        audienceDesc: 'Busy young professionals working all day and worrying about their pets at home.',
+        painPoint: 'Irregular feeding schedules cause pet anxiety.',
+        emotion: 'Peace of mind',
+        positioning: 'premium',
+        platform: 'TikTok',
+        ratio: '9:16',
+        totalLength: 32,
+        hookStyle: 'problem-solution',
+        ctaType: 'buy now',
+        voiceoverStyle: 'female',
+        voiceoverSpeed: 'normal',
+        hasVoiceover: true,
+        onScreenText: true,
+        brandName: 'PetPurr',
+        brandSlogan: 'Smart care for happy pets',
+        musicVibe: 'Chill lo-fi beats',
+      });
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'usage') => {
@@ -151,7 +188,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
           <Info className="w-5 h-5 text-indigo-500" />
-          Thông tin sản phẩm
+          {t('productInfo')}
         </h2>
         <div className="flex items-center gap-3">
           <button
@@ -160,7 +197,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             className="text-xs font-medium text-emerald-600 hover:text-emerald-500 flex items-center gap-1"
           >
             <Save className="w-3 h-3" />
-            Lưu mẫu
+            {t('saveTemplate')}
           </button>
           <button
             type="button"
@@ -168,54 +205,54 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             className="text-xs font-medium text-indigo-600 hover:text-indigo-500 flex items-center gap-1"
           >
             <Sparkles className="w-3 h-3" />
-            Điền mẫu thử
+            {language === 'vi' ? 'Điền mẫu thử' : 'Fill sample'}
           </button>
         </div>
       </div>
 
       {/* Section A: Product Basics */}
       <div className="space-y-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">A. Thông tin cơ bản</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">A. {language === 'vi' ? 'Thông tin cơ bản' : 'Basic Info'}</h3>
         
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tên sản phẩm *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('productName')} *</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className={`w-full bg-zinc-50 dark:bg-zinc-900 border ${errors.name ? 'border-red-500' : 'border-zinc-200 dark:border-zinc-800'} rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none`}
-              placeholder="VD: Máy cho ăn PetPurr"
+              placeholder={language === 'vi' ? 'VD: Máy cho ăn PetPurr' : 'e.g. PetPurr Feeder'}
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Danh mục *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('category')} *</label>
             <input
               type="text"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className={`w-full bg-zinc-50 dark:bg-zinc-900 border ${errors.category ? 'border-red-500' : 'border-zinc-200 dark:border-zinc-800'} rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none`}
-              placeholder="VD: Đồ dùng thú cưng"
+              placeholder={language === 'vi' ? 'VD: Đồ dùng thú cưng' : 'e.g. Pet Supplies'}
             />
             {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
           </div>
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Đối tượng mục tiêu *</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('targetUser')} *</label>
           <input
             type="text"
             value={formData.targetUser}
             onChange={(e) => setFormData({ ...formData, targetUser: e.target.value })}
             className={`w-full bg-zinc-50 dark:bg-zinc-900 border ${errors.targetUser ? 'border-red-500' : 'border-zinc-200 dark:border-zinc-800'} rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none`}
-            placeholder="VD: Chủ nuôi mèo bận rộn"
+            placeholder={language === 'vi' ? 'VD: Chủ nuôi mèo bận rộn' : 'e.g. Busy cat owners'}
           />
           {errors.targetUser && <p className="text-xs text-red-500 mt-1">{errors.targetUser}</p>}
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Lợi ích chính *</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('benefits')} *</label>
           <div className="flex flex-wrap gap-2">
             {benefitOptions.map((b) => (
               <button
@@ -237,13 +274,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             value={formData.customBenefit}
             onChange={(e) => setFormData({ ...formData, customBenefit: e.target.value })}
             className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-            placeholder="Thêm lợi ích khác..."
+            placeholder={language === 'vi' ? 'Thêm lợi ích khác...' : 'Add other benefits...'}
           />
           {errors.benefits && <p className="text-xs text-red-500 mt-1">{errors.benefits}</p>}
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tính năng nổi bật *</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('features')} *</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -251,7 +288,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
               onChange={(e) => setFeatureInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
               className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="Thêm tính năng..."
+              placeholder={language === 'vi' ? 'Thêm tính năng...' : 'Add feature...'}
             />
             <button
               type="button"
@@ -276,7 +313,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Giá *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('price')} *</label>
             <div className="flex gap-2">
               <input
                 type="number"
@@ -297,13 +334,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price}</p>}
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Khuyến mãi (Không bắt buộc)</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('promotion')} ({language === 'vi' ? 'Không bắt buộc' : 'Optional'})</label>
             <input
               type="text"
               value={formData.promotion || ''}
               onChange={(e) => setFormData({ ...formData, promotion: e.target.value })}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="VD: Giảm 20% hôm nay"
+              placeholder={language === 'vi' ? 'VD: Giảm 20% hôm nay' : 'e.g. 20% off today'}
             />
           </div>
         </div>
@@ -311,45 +348,45 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
 
       {/* Section B: Audience & Positioning */}
       <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">B. Khán giả & Định vị</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">B. {language === 'vi' ? 'Khán giả & Định vị' : 'Audience & Positioning'}</h3>
         
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Mô tả khán giả *</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('audienceDesc')} *</label>
           <textarea
             value={formData.audienceDesc}
             onChange={(e) => setFormData({ ...formData, audienceDesc: e.target.value })}
             className={`w-full bg-zinc-50 dark:bg-zinc-900 border ${errors.audienceDesc ? 'border-red-500' : 'border-zinc-200 dark:border-zinc-800'} rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none h-20`}
-            placeholder="Mô tả độ tuổi, tính cách, nhu cầu..."
+            placeholder={language === 'vi' ? 'Mô tả độ tuổi, tính cách, nhu cầu...' : 'Describe age, personality, needs...'}
           />
           {errors.audienceDesc && <p className="text-xs text-red-500 mt-1">{errors.audienceDesc}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Nỗi đau chính *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('painPoint')} *</label>
             <input
               type="text"
               value={formData.painPoint}
               onChange={(e) => setFormData({ ...formData, painPoint: e.target.value })}
               className={`w-full bg-zinc-50 dark:bg-zinc-900 border ${errors.painPoint ? 'border-red-500' : 'border-zinc-200 dark:border-zinc-800'} rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none`}
-              placeholder="VD: Không có thời gian cho thú cưng ăn"
+              placeholder={language === 'vi' ? 'VD: Không có thời gian cho thú cưng ăn' : 'e.g. No time to feed pets'}
             />
             {errors.painPoint && <p className="text-xs text-red-500 mt-1">{errors.painPoint}</p>}
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Cảm xúc mong muốn *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('emotion')} *</label>
             <input
               type="text"
               value={formData.emotion}
               onChange={(e) => setFormData({ ...formData, emotion: e.target.value })}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="VD: Dễ thương, Khẩn cấp, Sang trọng"
+              placeholder={language === 'vi' ? 'VD: Dễ thương, Khẩn cấp, Sang trọng' : 'e.g. Cute, Urgent, Premium'}
             />
           </div>
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Định vị thương hiệu *</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('positioning')} *</label>
           <div className="grid grid-cols-3 gap-2">
             {(['budget', 'mid', 'premium'] as const).map((p) => (
               <button
@@ -362,7 +399,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
                     : 'bg-white border-zinc-200 text-zinc-600 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400'
                 }`}
               >
-                {p === 'budget' ? 'Giá rẻ' : p === 'mid' ? 'Tầm trung' : 'Cao cấp'}
+                {p === 'budget' ? (language === 'vi' ? 'Giá rẻ' : 'Budget') : p === 'mid' ? (language === 'vi' ? 'Tầm trung' : 'Mid-range') : (language === 'vi' ? 'Cao cấp' : 'Premium')}
               </button>
             ))}
           </div>
@@ -371,11 +408,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
 
       {/* Section C: Ad Requirements */}
       <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">C. Yêu cầu quảng cáo</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">C. {language === 'vi' ? 'Yêu cầu quảng cáo' : 'Ad Requirements'}</h3>
         
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Nền tảng *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('platform')} *</label>
             <select
               value={formData.platform}
               onChange={(e) => setFormData({ ...formData, platform: e.target.value as Platform })}
@@ -388,22 +425,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tỷ lệ video *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('ratio')} *</label>
             <select
               value={formData.ratio}
               onChange={(e) => setFormData({ ...formData, ratio: e.target.value as VideoRatio })}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
             >
-              <option value="9:16">9:16 (Dọc)</option>
-              <option value="1:1">1:1 (Vuông)</option>
-              <option value="16:9">16:9 (Ngang)</option>
+              <option value="9:16">9:16 ({language === 'vi' ? 'Dọc' : 'Vertical'})</option>
+              <option value="1:1">1:1 ({language === 'vi' ? 'Vuông' : 'Square'})</option>
+              <option value="16:9">16:9 ({language === 'vi' ? 'Ngang' : 'Horizontal'})</option>
             </select>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tổng thời lượng (s) *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('totalLength')} (s) *</label>
             <input
               type="number"
               step="8"
@@ -414,48 +451,48 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             {formData.totalLength % 8 !== 0 && (
               <div className="flex items-center gap-1 text-[10px] text-amber-600 mt-1">
                 <AlertCircle className="w-3 h-3" />
-                Sẽ được làm tròn thành {Math.ceil(formData.totalLength / 8) * 8}s
+                {language === 'vi' ? `Sẽ được làm tròn thành ${Math.ceil(formData.totalLength / 8) * 8}s` : `Will be rounded to ${Math.ceil(formData.totalLength / 8) * 8}s`}
               </div>
             )}
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Kiểu Hook *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('hookStyle')} *</label>
             <select
               value={formData.hookStyle}
               onChange={(e) => setFormData({ ...formData, hookStyle: e.target.value as HookStyle })}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
             >
-              <option value="question">Câu hỏi</option>
-              <option value="shock">Gây sốc/Bất ngờ</option>
-              <option value="story">Kể chuyện</option>
-              <option value="problem-solution">Vấn đề - Giải pháp</option>
-              <option value="testimonial">Lời chứng thực</option>
+              <option value="question">{language === 'vi' ? 'Câu hỏi' : 'Question'}</option>
+              <option value="shock">{language === 'vi' ? 'Gây sốc/Bất ngờ' : 'Shock/Surprise'}</option>
+              <option value="story">{language === 'vi' ? 'Kể chuyện' : 'Storytelling'}</option>
+              <option value="problem-solution">{language === 'vi' ? 'Vấn đề - Giải pháp' : 'Problem - Solution'}</option>
+              <option value="testimonial">{language === 'vi' ? 'Lời chứng thực' : 'Testimonial'}</option>
             </select>
           </div>
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Loại CTA *</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('ctaType')} *</label>
           <select
             value={formData.ctaType}
             onChange={(e) => setFormData({ ...formData, ctaType: e.target.value as CTAType })}
             className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
           >
-            <option value="buy now">Mua ngay</option>
-            <option value="message inbox">Nhắn tin</option>
-            <option value="click link">Click vào link</option>
-            <option value="comment keyword">Comment từ khóa</option>
+            <option value="buy now">{language === 'vi' ? 'Mua ngay' : 'Buy now'}</option>
+            <option value="message inbox">{language === 'vi' ? 'Nhắn tin' : 'Message inbox'}</option>
+            <option value="click link">{language === 'vi' ? 'Click vào link' : 'Click link'}</option>
+            <option value="comment keyword">{language === 'vi' ? 'Comment từ khóa' : 'Comment keyword'}</option>
           </select>
         </div>
       </div>
 
       {/* Section D: Creative Assets */}
       <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">D. Tài sản sáng tạo</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">D. {language === 'vi' ? 'Tài sản sáng tạo' : 'Creative Assets'}</h3>
         
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tên thương hiệu (Opt)</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('brandName')} ({language === 'vi' ? 'Opt' : 'Optional'})</label>
             <input
               type="text"
               value={formData.brandName || ''}
@@ -464,7 +501,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Slogan (Opt)</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('brandSlogan')} ({language === 'vi' ? 'Opt' : 'Optional'})</label>
             <input
               type="text"
               value={formData.brandSlogan || ''}
@@ -476,68 +513,84 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Giới tính giọng đọc *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('voiceoverStyle')} *</label>
             <select
               value={formData.voiceoverStyle}
               onChange={(e) => setFormData({ ...formData, voiceoverStyle: e.target.value as VoiceoverStyle })}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
             >
-              <option value="male">Nam</option>
-              <option value="female">Nữ</option>
-              <option value="neutral">Trung tính</option>
+              <option value="male">{language === 'vi' ? 'Nam' : 'Male'}</option>
+              <option value="female">{language === 'vi' ? 'Nữ' : 'Female'}</option>
+              <option value="neutral">{language === 'vi' ? 'Trung tính' : 'Neutral'}</option>
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tốc độ đọc *</label>
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('voiceoverSpeed')} *</label>
             <select
               value={formData.voiceoverSpeed}
               onChange={(e) => setFormData({ ...formData, voiceoverSpeed: e.target.value as VoiceoverSpeed })}
               className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
             >
-              <option value="slow">Chậm</option>
-              <option value="normal">Bình thường</option>
-              <option value="fast">Nhanh</option>
+              <option value="slow">{language === 'vi' ? 'Chậm' : 'Slow'}</option>
+              <option value="normal">{language === 'vi' ? 'Bình thường' : 'Normal'}</option>
+              <option value="fast">{language === 'vi' ? 'Nhanh' : 'Fast'}</option>
             </select>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Cho phép chữ trên màn hình?</label>
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, onScreenText: !formData.onScreenText })}
-            className={`w-12 h-6 rounded-full transition-all relative ${
-              formData.onScreenText ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
-            }`}
-          >
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-              formData.onScreenText ? 'left-7' : 'left-1'
-            }`} />
-          </button>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('hasVoiceover')}?</label>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, hasVoiceover: !formData.hasVoiceover })}
+              className={`w-12 h-6 rounded-full transition-all relative ${
+                formData.hasVoiceover ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
+              }`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                formData.hasVoiceover ? 'left-7' : 'left-1'
+              }`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('onScreenText')}?</label>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, onScreenText: !formData.onScreenText })}
+              className={`w-12 h-6 rounded-full transition-all relative ${
+                formData.onScreenText ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
+              }`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                formData.onScreenText ? 'left-7' : 'left-1'
+              }`} />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Vibe âm nhạc (Opt)</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('musicVibe')} ({language === 'vi' ? 'Opt' : 'Optional'})</label>
           <input
             type="text"
             value={formData.musicVibe || ''}
             onChange={(e) => setFormData({ ...formData, musicVibe: e.target.value })}
             className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm outline-none"
-            placeholder="VD: Sôi động, Chill lo-fi"
+            placeholder={language === 'vi' ? 'VD: Sôi động, Chill lo-fi' : 'e.g. Energetic, Chill lo-fi'}
           />
         </div>
       </div>
 
       {/* Section E: Visual Context */}
       <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">E. Ảnh mẫu tham khảo</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">E. {language === 'vi' ? 'Ảnh mẫu tham khảo' : 'Visual Context'}</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Product Direct Images */}
           <div className="space-y-3">
             <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-indigo-500" />
-              Ảnh trực tiếp sản phẩm
+              {language === 'vi' ? 'Ảnh trực tiếp sản phẩm' : 'Direct product images'}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {(formData.productImages || []).map((img, i) => (
@@ -554,7 +607,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
               ))}
               <label className="aspect-square rounded-lg border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition-all">
                 <Upload className="w-5 h-5 text-zinc-400" />
-                <span className="text-[10px] text-zinc-500 mt-1">Tải lên</span>
+                <span className="text-[10px] text-zinc-500 mt-1">{language === 'vi' ? 'Tải lên' : 'Upload'}</span>
                 <input
                   type="file"
                   multiple
@@ -570,7 +623,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
           <div className="space-y-3">
             <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-indigo-500" />
-              Ảnh sử dụng sản phẩm
+              {language === 'vi' ? 'Ảnh sử dụng sản phẩm' : 'Product usage images'}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {(formData.usageImages || []).map((img, i) => (
@@ -587,7 +640,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
               ))}
               <label className="aspect-square rounded-lg border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition-all">
                 <Upload className="w-5 h-5 text-zinc-400" />
-                <span className="text-[10px] text-zinc-500 mt-1">Tải lên</span>
+                <span className="text-[10px] text-zinc-500 mt-1">{language === 'vi' ? 'Tải lên' : 'Upload'}</span>
                 <input
                   type="file"
                   multiple
@@ -616,14 +669,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             <>
               <div className="flex flex-col items-center">
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span className="text-[8px] opacity-70">Gemini 3 Flash</span>
+                <span className="text-[8px] opacity-70">Gemini 2.5 Flash</span>
               </div>
-              Đang tạo kịch bản...
+              {t('generatingScript')}
             </>
           ) : (
             <>
               <Sparkles className="w-5 h-5" />
-              Tạo kịch bản quảng cáo
+              {t('generateScript')}
             </>
           )}
         </button>

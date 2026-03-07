@@ -6,15 +6,20 @@ import { SavedTemplatesTab } from './components/SavedTemplatesTab';
 import { SpyVideoTab } from './components/SpyVideoTab';
 import { ScriptViewer } from './components/ScriptViewer';
 import { VideoGenerationTab } from './components/VideoGenerationTab';
+import { AffiliateChannelTab } from './components/AffiliateChannelTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
-import { AdScript, AdSegment, Language, Tone, ProductInfo, SavedTemplate } from './types';
+import { AdScript, AdSegment, Language, Tone, ProductInfo, SavedTemplate, AffiliateIdea } from './types';
 import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateImage, generateVideoPrompts } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
-import { Info, Image as ImageIcon, Bookmark, Video, Search } from 'lucide-react';
+import { Info, Image as ImageIcon, Bookmark, Video, Search, Globe } from 'lucide-react';
+
+import { UsageDashboard } from './components/UsageDashboard';
+import { useTranslation } from './i18n';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'images' | 'templates' | 'video' | 'spy'>('form');
-  const [language, setLanguage] = useState<Language>('en');
+  const [activeTab, setActiveTab] = useState<'form' | 'affiliate' | 'images' | 'templates' | 'video' | 'spy'>('form');
+  const [language, setLanguage] = useState<Language>('vi');
+  const { t } = useTranslation(language);
   const [tone, setTone] = useState<Tone>('Informative');
   const [brandVoice, setBrandVoice] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -44,12 +49,28 @@ export default function App() {
         console.error('Failed to parse templates', e);
       }
     }
+
+    const savedCurrentScript = localStorage.getItem('current_adscript');
+    if (savedCurrentScript) {
+      try {
+        setCurrentScript(JSON.parse(savedCurrentScript));
+      } catch (e) {
+        console.error('Failed to parse current script', e);
+      }
+    }
     
     // Check dark mode preference
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setDarkMode(true);
     }
   }, []);
+
+  // Sync current script to local storage
+  useEffect(() => {
+    if (currentScript) {
+      localStorage.setItem('current_adscript', JSON.stringify(currentScript));
+    }
+  }, [currentScript]);
 
   // Sync history to local storage
   useEffect(() => {
@@ -126,6 +147,57 @@ export default function App() {
     });
   };
 
+  const handleSendToImages = (idea: AffiliateIdea) => {
+    const newScript: AdScript = {
+      id: idea.id,
+      timestamp: Date.now(),
+      language: language,
+      tone: 'Informative',
+      productInfo: {
+        name: idea.conceptTitle,
+        category: idea.topic,
+        targetUser: idea.contentAngle,
+        benefits: [],
+        customBenefit: '',
+        features: [],
+        price: 0,
+        currency: 'VND',
+        audienceDesc: '',
+        painPoint: '',
+        emotion: '',
+        positioning: 'mid',
+        platform: idea.platform as any,
+        ratio: '9:16',
+        totalLength: 30,
+        hookStyle: 'question',
+        ctaType: 'click link',
+        voiceoverStyle: 'neutral',
+        voiceoverSpeed: 'normal',
+        hasVoiceover: true,
+        onScreenText: true
+      },
+      segments: idea.scenes.map(s => ({
+        id: `${idea.id}-${s.scene}`,
+        index: s.scene,
+        startTime: (s.scene - 1) * 5,
+        endTime: s.scene * 5,
+        visualDirection: s.visualDescription,
+        onScreenText: '',
+        voiceover: s.script,
+        sfx: '',
+        imagePrompt: s.imagePrompt,
+        videoPrompt: s.videoPrompt
+      }))
+    };
+    setCurrentScript(newScript);
+    setActiveTab('images');
+  };
+
+  const handleSendToVideo = (idea: AffiliateIdea) => {
+    handleSendToImages(idea);
+    setActiveTab('video');
+  };
+
   const handleUpdateSegments = (newSegments: AdSegment[]) => {
     if (currentScript) {
       setCurrentScript({ ...currentScript, segments: newSegments });
@@ -188,6 +260,7 @@ export default function App() {
         ctaType: 'buy now',
         voiceoverStyle: 'neutral',
         voiceoverSpeed: 'normal',
+        hasVoiceover: true,
         onScreenText: true,
       } as ProductInfo,
       characterProfile: script.characterProfile,
@@ -199,6 +272,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
+      <UsageDashboard language={language} />
       <SettingsBar
         language={language}
         setLanguage={setLanguage}
@@ -223,6 +297,7 @@ export default function App() {
               <ApiKeySettings 
                 onSave={() => setShowApiKeyModal(false)} 
                 onCancel={() => setShowApiKeyModal(false)} 
+                language={language}
               />
             </motion.div>
           </div>
@@ -243,29 +318,46 @@ export default function App() {
               }`}
             >
               <Info className="w-4 h-4" />
-              Thông tin sản phẩm
+              {t('productInfo')}
+            </button>
+            <button
+              onClick={() => setActiveTab('affiliate')}
+              className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                activeTab === 'affiliate'
+                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              {t('affiliateChannel')}
             </button>
             <button
               onClick={() => setActiveTab('images')}
+              disabled={!currentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'images'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                !currentScript 
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
+                  : activeTab === 'images'
+                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
               }`}
             >
               <ImageIcon className="w-4 h-4" />
-              Ảnh sản phẩm
+              {t('productImages')}
             </button>
             <button
               onClick={() => setActiveTab('video')}
+              disabled={!currentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'video'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                !currentScript 
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
+                  : activeTab === 'video'
+                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
               }`}
             >
               <Video className="w-4 h-4" />
-              Xây dựng Video
+              {t('buildVideo')}
             </button>
             <button
               onClick={() => setActiveTab('spy')}
@@ -276,7 +368,7 @@ export default function App() {
               }`}
             >
               <Search className="w-4 h-4" />
-              Spy Video
+              {t('spyVideo')}
             </button>
             <button
               onClick={() => setActiveTab('templates')}
@@ -287,7 +379,7 @@ export default function App() {
               }`}
             >
               <Bookmark className="w-4 h-4" />
-              Mẫu đã lưu
+              {t('savedTemplates')}
             </button>
           </div>
 
@@ -316,9 +408,9 @@ export default function App() {
                     </div>
                   </div>
                   <div className="text-center space-y-2">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Đang soạn kịch bản...</h3>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t('generatingScript')}</h3>
                     <p className="text-sm text-zinc-500 max-w-xs">
-                      AI đang phân tích thông tin sản phẩm để tạo kịch bản quảng cáo hiệu quả nhất cho bạn.
+                      {t('aiAnalyzing')}
                     </p>
                   </div>
                 </motion.div>
@@ -336,30 +428,45 @@ export default function App() {
                         onSaveTemplate={handleSaveTemplate}
                         isLoading={isLoading} 
                         initialValue={editingTemplate}
+                        language={language}
+                      />
+                    </div>
+                  ) : activeTab === 'affiliate' ? (
+                    <div className="max-w-7xl mx-auto">
+                      <AffiliateChannelTab 
+                        language={language}
+                        onSendToImages={handleSendToImages}
+                        onSendToVideo={handleSendToVideo}
                       />
                     </div>
                   ) : activeTab === 'images' ? (
-                    <ApiKeyGuard>
+                    <ApiKeyGuard language={language}>
                       <div className="max-w-6xl mx-auto">
-                        <ProductImageTab script={currentScript} onUpdateSegment={handleUpdateSegment} />
+                        <ProductImageTab 
+                          script={currentScript} 
+                          onUpdateSegment={handleUpdateSegment} 
+                          language={language}
+                        />
                       </div>
                     </ApiKeyGuard>
                   ) : activeTab === 'video' ? (
-                    <ApiKeyGuard>
-                      <div className="max-w-6xl mx-auto">
-                        <VideoGenerationTab currentScript={currentScript} onUpdateSegment={handleUpdateSegment} />
-                      </div>
+                    <ApiKeyGuard language={language}>
+                      <VideoGenerationTab currentScript={currentScript} language={language} />
                     </ApiKeyGuard>
                   ) : activeTab === 'spy' ? (
                     <div className="max-w-6xl mx-auto">
-                      <SpyVideoTab onUseScript={handleUseSpyScript} />
+                      <SpyVideoTab 
+                        onUseScript={handleUseSpyScript} 
+                        language={language}
+                      />
                     </div>
                   ) : (
                     <div className="max-w-4xl mx-auto">
                       <SavedTemplatesTab 
                         templates={savedTemplates} 
                         onLoad={handleLoadTemplate} 
-                        onDelete={handleDeleteTemplate} 
+                        onDelete={handleDeleteTemplate}
+                        language={language}
                       />
                     </div>
                   )}

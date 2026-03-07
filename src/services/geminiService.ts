@@ -1,5 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ProductInfo, AdSegment, Language, Tone, AdScript } from "../types";
+import { trackUsage, calculateCost } from "./costService";
+
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 const getApiKey = (type: 'gemini' | 'veo' = 'gemini') => {
   const manualGeminiKey = typeof window !== 'undefined' ? localStorage.getItem('manual_gemini_api_key') : null;
@@ -84,6 +87,32 @@ async function callGeminiWithRetry(
   }
 
   const ai = getAiInstance(type);
+  const modelName = params.model || DEFAULT_MODEL;
+
+  // Estimation phase
+  let estimatedInputTokens = 0;
+  let estimatedOutputTokens = 1000; // Default estimate for output
+  
+  try {
+    const countResult = await ai.models.countTokens({
+      model: modelName,
+      contents: params.contents
+    });
+    estimatedInputTokens = countResult.totalTokens || 0;
+  } catch (e) {
+    console.warn("Failed to count tokens for estimation", e);
+  }
+
+  // Notify UI about estimation (we'll use a custom event)
+  const estimateEvent = new CustomEvent('gemini_cost_estimate', {
+    detail: {
+      model: modelName,
+      inputTokens: estimatedInputTokens,
+      outputTokens: estimatedOutputTokens,
+      estimatedCost: calculateCost(estimatedInputTokens, estimatedOutputTokens)
+    }
+  });
+  window.dispatchEvent(estimateEvent);
 
   return apiQueue.add(async () => {
     let lastError: any;
@@ -98,6 +127,29 @@ async function callGeminiWithRetry(
         
         const response = await ai.models.generateContent(params);
         
+        // Tracking actual usage
+        const actualInputTokens = response.usageMetadata?.promptTokenCount || estimatedInputTokens;
+        const actualOutputTokens = response.usageMetadata?.candidatesTokenCount || 0;
+        
+        trackUsage(
+          modelName,
+          estimatedInputTokens,
+          estimatedOutputTokens,
+          actualInputTokens,
+          actualOutputTokens
+        );
+
+        // Notify UI about actual cost
+        const actualEvent = new CustomEvent('gemini_cost_actual', {
+          detail: {
+            model: modelName,
+            actualInputTokens,
+            actualOutputTokens,
+            actualCost: calculateCost(actualInputTokens, actualOutputTokens)
+          }
+        });
+        window.dispatchEvent(actualEvent);
+
         // Cache the successful response
         cache.set(cacheKey, response);
         return response;
@@ -134,7 +186,7 @@ export async function generateAdScript(
   tone: Tone,
   brandVoice: boolean
 ): Promise<AdSegment[]> {
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
   const systemInstruction = `You are an expert short-form ad script writer. 
   Generate a high-converting ad script split into 8-second segments.
@@ -143,6 +195,7 @@ export async function generateAdScript(
   Language: ${language === 'vi' ? 'Vietnamese' : 'English'}.
   Tone: ${tone}.
   Brand Voice: ${brandVoice ? 'Enabled (more professional and consistent)' : 'Disabled'}.
+  Voiceover: ${product.hasVoiceover ? 'Enabled. Generate natural, persuasive dialogue.' : 'Disabled. Set voiceover to empty string.'}.
   Structure Strategy: Use AIDA (Attention, Interest, Desire, Action) or PAS (Problem, Agitation, Solution).
   - Segment 1: Strong hook.
   - Middle segments: Benefits, proof, objection handling.
@@ -185,8 +238,7 @@ export async function generateAdScript(
   - Slogan: ${product.brandSlogan || 'N/A'}
   - Keywords to include: ${product.keywordsInclude || 'N/A'}
   - Keywords to avoid: ${product.keywordsAvoid || 'N/A'}
-  - Voiceover: ${product.voiceoverStyle}, ${product.voiceoverSpeed} speed
-  - On-screen text allowed: ${product.onScreenText ? 'Yes' : 'No'}
+  - Voiceover: ${product.hasVoiceover ? `${product.voiceoverStyle}, ${product.voiceoverSpeed} speed` : 'None'}
   - Music vibe: ${product.musicVibe || 'N/A'}
   
   Generate exactly ${product.totalLength / 8} segments of 8 seconds each.
@@ -256,7 +308,7 @@ export async function generateAdScript(
 }
 
 export async function generateCharacterProfile(product: ProductInfo): Promise<string> {
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   const prompt = `Based on this product and target audience, create a detailed visual description of a recurring character or mascot for the ad campaign to ensure visual consistency. 
   Product: ${product.name}
   Audience: ${product.audienceDesc}
@@ -298,7 +350,7 @@ export async function generateImagePrompts(
   characterProfile: string,
   productName: string
 ): Promise<string[]> {
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   const prompt = `For each of the following ad segments, generate a high-quality, detailed image generation prompt. 
   
   CRITICAL: Visual Consistency
@@ -381,19 +433,34 @@ export async function generateVideoPrompts(
   characterProfile: string,
   productName: string
 ): Promise<string[]> {
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
-  const prompt = `For each of the following ad segments, generate a high-quality video generation prompt for Veo 3. 
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  const prompt = `You are an expert AI Video Director specializing in Veo 3 (Google's high-end video generation model).
+  Your task is to ANALYZE the following ad segments and create highly detailed, cinematic video generation prompts for each.
   
-  CRITICAL: Visual Consistency & Motion
+  ANALYSIS GOALS:
+  1. Visual Continuity: Ensure the character and environment remain consistent across all segments.
+  2. Dynamic Motion: Describe specific camera movements (dolly, pan, tilt) and subject actions.
+  3. Lighting & Atmosphere: Define the mood, color palette, and lighting style (e.g., "golden hour", "soft studio lighting").
+  4. Veo 3 Optimization: Use descriptive, high-fidelity language that Veo 3 understands best.
+  
+  INPUT DATA:
+  - Product Name: ${productName}
   - Character Profile: ${characterProfile}
-  - The character described above MUST be the main subject.
-  - Product: ${productName}
-  - Describe the motion, activity, and transition between the start and end of the segment.
   
-  Segments:
-  ${segments.map(s => `Segment ${s.index}: ${s.visualDirection}`).join("\n")}
+  SEGMENTS TO ANALYZE:
+  ${segments.map(s => `
+  Segment ${s.index}:
+  - Visual Direction: ${s.visualDirection}
+  - Voiceover: ${s.voiceover}
+  - On-Screen Text: ${s.onScreenText}
+  `).join("\n")}
   
-  Return a JSON array of strings, one for each segment. Each prompt should be in English and optimized for video generation (cinematic, smooth motion, high detail).`;
+  OUTPUT REQUIREMENTS:
+  - Return a JSON array of strings.
+  - Each string is a comprehensive video prompt in English for the corresponding segment.
+  - Focus on the "storytelling" aspect of the motion.
+  - Include details about textures, materials, and subtle environmental effects.
+  `;
 
   const response = await callGeminiWithRetry({
     model,
@@ -417,6 +484,9 @@ export async function generateVideo(
   aspectRatio: "16:9" | "9:16" = "9:16"
 ): Promise<string> {
   const apiKey = getApiKey('veo');
+  if (!apiKey) {
+    throw new Error("Chưa cấu hình Veo API Key. Vui lòng vào phần Cài đặt để nhập Key.");
+  }
   const aiVideo = new GoogleGenAI({ apiKey });
 
   const config: any = {
@@ -459,7 +529,7 @@ export async function generateVideo(
         lastError = error;
         const msg = error?.message || "";
         if (msg.includes("Requested entity was not found") || msg.includes("403") || msg.includes("permission")) {
-          throw new Error("Tính năng tạo Video (Veo) YÊU CẦU tài khoản trả phí (Paid). Tài khoản Miễn phí không thể sử dụng tính năng này.");
+          throw new Error("Lỗi quyền truy cập Veo 3: Tài khoản của bạn có thể là gói Miễn phí hoặc chưa kích hoạt 'Generative AI API' trong Google Cloud Project. Veo 3 yêu cầu tài khoản Trả phí (Paid).");
         }
         if (!msg.includes("429")) throw error;
       }
@@ -499,8 +569,216 @@ export async function generateVideo(
   });
 }
 
+export async function refineImagePrompt(
+  currentPrompt: string, 
+  instruction: string,
+  characterProfile: string = ""
+): Promise<string> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  const prompt = `You are an AI image prompt engineer. 
+  Your task is to refine or modify an existing image generation prompt based on a user's instruction (which might be in Vietnamese).
+  
+  CURRENT PROMPT: "${currentPrompt}"
+  USER INSTRUCTION: "${instruction}"
+  CHARACTER PROFILE (for consistency): "${characterProfile}"
+  
+  RULES:
+  1. The output must be a single, high-quality, detailed image generation prompt in English.
+  2. Incorporate the user's instruction into the current prompt.
+  3. Maintain visual consistency with the character profile if provided.
+  4. Focus on photorealistic, 8k, cinematic details.
+  5. Return ONLY the refined English prompt.
+  `;
+
+  const response = await callGeminiWithRetry({
+    model,
+    contents: prompt,
+  });
+
+  return response.text || currentPrompt;
+}
+
+export async function translatePrompt(text: string, targetLanguage: 'English' | 'Vietnamese' = 'English'): Promise<string> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  const prompt = `Translate the following image generation prompt to ${targetLanguage}. 
+  Keep technical terms, artistic styles, and descriptive details accurate for AI image generation. 
+  Return ONLY the translated text.
+  
+  Text: ${text}`;
+
+  const response = await callGeminiWithRetry({
+    model,
+    contents: prompt,
+  });
+
+  return response.text || text;
+}
+
+export async function generateAffiliateIdeas(info: any, language: string): Promise<any[]> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  
+  const prompt = `You are a world-class Affiliate Marketing Strategist and Content Creator. 
+  Based on the following channel strategy, generate ${info.ideaCount} diverse and highly engaging content ideas/scripts for an affiliate channel.
+  
+  CHANNEL STRATEGY:
+  - Platform: ${info.platform}
+  - Channel Type: ${info.channelType}
+  - Goal: ${info.channelGoal}
+  - Channel Name: ${info.channelName}
+  - Description: ${info.channelDescription}
+  - Main Topic: ${info.mainTopic}
+  - Sub Topics: ${info.subTopics.join(', ')}
+  - Target Audience: ${info.targetAudience.join(', ')}
+  - Customer Insight: ${info.customerInsight}
+  - Pain Points: ${info.customerPainPoints}
+  - Style: ${info.contentStyle.join(', ')}
+  - Tone: ${info.contentTone}
+  - Video Length: ${info.targetVideoLength}
+  - Hook Types: ${info.hookType.join(', ')}
+  - Script Structure: ${info.scriptStructure}
+  - Segment Count: ${info.segmentCount}
+  - Special Requirements: ${info.specialRequirements}
+  
+  REQUIREMENTS:
+  1. Analyze the chosen platform's algorithm and create content optimized for it.
+  2. Generate diverse content angles (e.g., educational, emotional, controversial, trend-based).
+  3. Each script must have a strong hook within the first 3 seconds.
+  4. Each script must be divided into ${info.segmentCount} clear scenes.
+  5. For each scene, provide:
+     - script: The spoken words or text on screen.
+     - visual_description: What happens visually.
+     - image_prompt: A detailed English prompt for AI image generation (Stable Diffusion/Midjourney style).
+     - video_prompt: A detailed English prompt for AI video generation (Veo/Sora style).
+  
+  OUTPUT FORMAT:
+  Return ONLY a JSON array of objects with this structure:
+  [
+    {
+      "id": "unique_id",
+      "conceptTitle": "Catchy title for the idea",
+      "platform": "${info.platform}",
+      "topic": "Specific topic angle",
+      "contentAngle": "The strategy behind this idea",
+      "hookType": "Type of hook used",
+      "hookText": "The actual hook text",
+      "cta": "${info.ctaText || 'Link in bio'}",
+      "scenes": [
+        {
+          "scene": 1,
+          "script": "...",
+          "visualDescription": "...",
+          "imagePrompt": "...",
+          "videoPrompt": "..."
+        }
+      ]
+    }
+  ]
+  
+  Language for script and descriptions: ${language === 'vi' ? 'Vietnamese' : 'English'}.
+  Prompts (imagePrompt, videoPrompt) must ALWAYS be in English.`;
+
+  const response = await callGeminiWithRetry({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json"
+    }
+  });
+
+  try {
+    return JSON.parse(response.text || '[]');
+  } catch (e) {
+    console.error("Failed to parse affiliate ideas JSON:", e);
+    return [];
+  }
+}
+
+export async function generateMotionPrompt(
+  currentScene: any,
+  context: { before: any[], after: any[] },
+  imageUrl: string,
+  language: Language = 'vi'
+): Promise<{ prompt: string; title: string }> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  
+  const systemInstruction = `You are a cinematic motion director and AI video prompt engineer.
+  Your task is to generate a highly detailed motion prompt for an AI video model (like Veo or Kling).
+  
+  The prompt must follow this structure:
+  1. Start Frame: Describe the initial state (based on the provided context).
+  2. Camera Movement: Use cinematic terms (crane down, dolly in, pan, tilt, etc.).
+  3. Character/Subject Motion: Describe how the subject moves in relation to the camera.
+  4. Environmental Interaction: Describe lighting changes, parallax effects, and background motion.
+  5. End Frame: Describe the final state (this should match the provided image's content).
+  
+  CRITICAL REQUIREMENTS:
+  - Duration: The motion should be balanced for a 6-10 second clip.
+  - Detail: Describe the "visual gateway", foreground elements, and the sense of discovery.
+  - Consistency: Ensure the art style, textures, and lighting match the provided image.
+  - Output: Return a JSON object with:
+    - prompt: The full, detailed English motion prompt.
+    - title: A short, catchy summary in Vietnamese (5-10 words) describing the motion.
+  `;
+
+  const prompt = `
+  CONTEXT:
+  - Previous Scenes: ${context.before.map(s => s.visualDirection || s.prompt).join(" | ")}
+  - CURRENT SCENE: ${currentScene.visualDirection || currentScene.prompt}
+  - Next Scenes: ${context.after.map(s => s.visualDirection || s.prompt).join(" | ")}
+  
+  IMAGE ANALYSIS:
+  The provided image represents the END FRAME of this sequence. Analyze its style, lighting, and composition.
+  
+  TASK:
+  Generate a cinematic motion prompt that leads into this END FRAME. 
+  Use the "discovery" approach: start with a wide shot or a hidden view, then move the camera to reveal the scene in the image.
+  `;
+
+  const getImageData = (img: string) => {
+    if (!img) return null;
+    const parts = img.split(',');
+    if (parts.length < 2) return null;
+    const header = parts[0];
+    const data = parts[1];
+    const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
+    return { mimeType, data };
+  };
+
+  const imgData = getImageData(imageUrl);
+  const contents = imgData 
+    ? { parts: [{ text: prompt }, { inlineData: imgData }] }
+    : prompt;
+
+  try {
+    const response = await callGeminiWithRetry({
+      model,
+      contents,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            prompt: { type: Type.STRING },
+            title: { type: Type.STRING },
+          },
+          required: ["prompt", "title"],
+        },
+      },
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Error generating motion prompt:", error);
+    return {
+      prompt: "Cinematic camera movement revealing the subject with smooth transitions and professional lighting.",
+      title: "Chuyển động điện ảnh mượt mà"
+    };
+  }
+}
+
 export async function analyzeVideo(videoBase64: string, mimeType: string): Promise<Partial<AdScript>> {
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || "gemini-3-flash-preview" : "gemini-3-flash-preview";
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   const prompt = `Analyze this advertisement video and extract the following information in JSON format:
   1. Product Name and Category
   2. Target Audience and Pain Points addressed

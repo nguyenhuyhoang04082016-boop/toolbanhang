@@ -1,6 +1,7 @@
 import React from 'react';
 import { Moon, Sun, Languages, Zap, ShieldCheck, Key } from 'lucide-react';
 import { Language, Tone } from '../types';
+import { useTranslation } from '../i18n';
 
 interface SettingsBarProps {
   language: Language;
@@ -27,6 +28,15 @@ export const SettingsBar: React.FC<SettingsBarProps> = ({
   toggleDarkMode,
   onOpenApiKeySettings,
 }) => {
+  const { t } = useTranslation(language);
+
+  const getToneLabel = (t: Tone) => {
+    if (language === 'vi') {
+      return t === 'Funny' ? 'Hài hước' : t === 'Premium' ? 'Sang trọng' : t === 'Urgent' ? 'Khẩn cấp' : t === 'Warm' ? 'Ấm áp' : 'Thông tin';
+    }
+    return t;
+  };
+
   return (
     <div className="h-16 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 bg-white dark:bg-zinc-950 sticky top-0 z-50">
       <div className="flex items-center gap-2">
@@ -43,10 +53,10 @@ export const SettingsBar: React.FC<SettingsBarProps> = ({
         <button
           onClick={onOpenApiKeySettings}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 transition-all"
-          title="Cấu hình API Gemini"
+          title={t('apiConfig')}
         >
           <Key className="w-4 h-4" />
-          <span className="hidden md:inline">Cấu hình API</span>
+          <span className="hidden md:inline">{t('apiConfig')}</span>
         </button>
 
         {/* Language Switch */}
@@ -79,9 +89,9 @@ export const SettingsBar: React.FC<SettingsBarProps> = ({
           onChange={(e) => setTone(e.target.value as Tone)}
           className="bg-zinc-100 dark:bg-zinc-900 border-none rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
         >
-          {tones.map((t) => (
-            <option key={t} value={t}>
-              Tông: {t === 'Funny' ? 'Hài hước' : t === 'Premium' ? 'Sang trọng' : t === 'Urgent' ? 'Khẩn cấp' : t === 'Warm' ? 'Ấm áp' : 'Thông tin'}
+          {tones.map((toneVal) => (
+            <option key={toneVal} value={toneVal}>
+              {t('tone')}: {getToneLabel(toneVal)}
             </option>
           ))}
         </select>
@@ -96,13 +106,14 @@ export const SettingsBar: React.FC<SettingsBarProps> = ({
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
-          Giọng thương hiệu
+          {t('brandVoice')}
         </button>
 
         {/* Dark Mode Toggle */}
         <button
           onClick={toggleDarkMode}
           className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 dark:text-zinc-400 transition-colors"
+          title={t('darkMode')}
         >
           {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>

@@ -2,13 +2,16 @@ import React, { useState, useRef } from 'react';
 import { Upload, Search, Loader2, Play, FileVideo, CheckCircle2, Copy, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { analyzeVideo } from '../services/geminiService';
-import { AdScript } from '../types';
+import { AdScript, Language } from '../types';
+import { useTranslation } from '../i18n';
 
 interface SpyVideoTabProps {
   onUseScript: (script: Partial<AdScript>) => void;
+  language: Language;
 }
 
-export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
+export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript, language }) => {
+  const { t } = useTranslation(language);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -20,7 +23,7 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 100 * 1024 * 1024) { // 100MB limit
-        setError("Video quá lớn. Vui lòng chọn video dưới 100MB.");
+        setError(language === 'vi' ? "Video quá lớn. Vui lòng chọn video dưới 100MB." : "Video too large. Please select a video under 100MB.");
         return;
       }
       setVideoFile(file);
@@ -47,7 +50,7 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
       };
     } catch (err) {
       console.error(err);
-      setError("Không thể phân tích video. Vui lòng thử lại.");
+      setError(language === 'vi' ? "Không thể phân tích video. Vui lòng thử lại." : "Could not analyze video. Please try again.");
       setIsAnalyzing(false);
     }
   };
@@ -56,7 +59,7 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
     <div className="max-w-5xl mx-auto space-y-8 pb-20">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold text-zinc-900 dark:text-white">Spy Video AI</h2>
-        <p className="text-zinc-500">Tải lên video đối thủ để AI bóc tách kịch bản, góc quay và phong cách nhân vật.</p>
+        <p className="text-zinc-500">{t('spyVideoDesc')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -77,8 +80,8 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
                 <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center mb-4">
                   <Upload className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Chọn Video để "Spy"</h3>
-                <p className="text-sm text-zinc-500 mt-2">Kéo thả hoặc click để tải lên (MP4, MOV, max 100MB)</p>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t('chooseVideoToSpy')}</h3>
+                <p className="text-sm text-zinc-500 mt-2">{t('dragAndDropVideo')}</p>
               </>
             )}
             <input 
@@ -101,12 +104,12 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span className="text-[8px] opacity-70">Gemini 3 Flash</span>
                 </div>
-                Đang bóc tách kịch bản...
+                {t('analyzingVideo')}
               </>
             ) : (
               <>
                 <Search className="w-5 h-5" />
-                Bắt đầu Phân tích Video
+                {t('startAnalysis')}
               </>
             )}
           </button>
@@ -123,14 +126,14 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
           <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
             <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
               <FileVideo className="w-5 h-5 text-indigo-500" />
-              Kết quả Phân tích
+              {t('analysisResults')}
             </h3>
             {analyzedData && (
               <button
                 onClick={() => onUseScript(analyzedData)}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors"
               >
-                Sử dụng Kịch bản này
+                {t('useThisScript')}
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
@@ -149,7 +152,7 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
                     <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                     <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-indigo-500 whitespace-nowrap">Gemini 3 Flash</span>
                   </div>
-                  <p className="text-sm font-medium mt-4">AI đang xem video và ghi chép...</p>
+                  <p className="text-sm font-medium mt-4">{t('aiAnalyzingVideo')}</p>
                 </motion.div>
               ) : analyzedData ? (
                 <motion.div
@@ -161,15 +164,15 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Thông tin Sản phẩm</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">{t('productInfo')}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
-                        <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Tên sản phẩm</p>
+                        <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">{t('productName')}</p>
                         <p className="text-sm font-bold">{analyzedData.productInfo?.name || 'N/A'}</p>
                       </div>
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
-                        <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Ngành hàng</p>
+                        <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">{t('category')}</p>
                         <p className="text-sm font-bold">{analyzedData.productInfo?.category || 'N/A'}</p>
                       </div>
                     </div>
@@ -179,11 +182,11 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Profile Nhân vật</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">{t('characterProfile')}</span>
                     </div>
                     <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-900/30">
                       <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                        {analyzedData.characterProfile || 'Không tìm thấy thông tin nhân vật.'}
+                        {analyzedData.characterProfile || (language === 'vi' ? 'Không tìm thấy thông tin nhân vật.' : 'Character profile not found.')}
                       </p>
                     </div>
                   </div>
@@ -192,13 +195,13 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Cấu trúc Kịch bản</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">{t('scriptStructure')}</span>
                     </div>
                     <div className="space-y-3">
                       {analyzedData.segments?.map((seg, idx) => (
                         <div key={idx} className="p-4 border border-zinc-100 dark:border-zinc-800 rounded-2xl space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-indigo-600">Phân đoạn {idx + 1}</span>
+                            <span className="text-xs font-bold text-indigo-600">{t('segment')} {idx + 1}</span>
                           </div>
                           <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{seg.visualDirection}</p>
                           {seg.voiceover && (
@@ -212,7 +215,7 @@ export const SpyVideoTab: React.FC<SpyVideoTabProps> = ({ onUseScript }) => {
               ) : (
                 <div className="h-full flex flex-col items-center justify-center space-y-4 text-zinc-400 py-20">
                   <Play className="w-12 h-12 opacity-10" />
-                  <p className="text-sm">Kết quả sẽ hiển thị tại đây sau khi phân tích.</p>
+                  <p className="text-sm">{t('resultsWillShowHere')}</p>
                 </div>
               )}
             </AnimatePresence>

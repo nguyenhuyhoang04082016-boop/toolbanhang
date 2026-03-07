@@ -1,24 +1,62 @@
-import React from 'react';
-import { AdScript, AdSegment } from '../types';
-import { Image as ImageIcon, Sparkles, Loader2, RefreshCw } from 'lucide-react';
-import { generateImage } from '../services/geminiService';
+import React, { useState } from 'react';
+import { AdScript, AdSegment, Language } from '../types';
+import { Image as ImageIcon, Sparkles, Loader2, RefreshCw, Download, Languages, Send } from 'lucide-react';
+import { generateImage, refineImagePrompt } from '../services/geminiService';
+import { useTranslation } from '../i18n';
 
 interface ProductImageTabProps {
   script: AdScript | null;
   onUpdateSegment: (segmentId: string, updates: Partial<AdSegment>) => void;
+  language: Language;
 }
 
-export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpdateSegment }) => {
+export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpdateSegment, language }) => {
+  const { t } = useTranslation(language);
+  const [viPrompts, setViPrompts] = useState<Record<string, string>>({});
+  const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({});
+
   if (!script) {
     return (
-      <div className="p-12 text-center space-y-4">
-        <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mx-auto">
-          <ImageIcon className="w-8 h-8 text-zinc-400" />
+      <div className="flex flex-col items-center justify-center p-20 space-y-6">
+        <div className="relative">
+          <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-3xl flex items-center justify-center animate-pulse">
+            <ImageIcon className="w-10 h-10 text-zinc-300" />
+          </div>
+          <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white dark:bg-zinc-800 rounded-2xl shadow-lg flex items-center justify-center border border-zinc-100 dark:border-zinc-800">
+            <Sparkles className="w-5 h-5 text-indigo-500" />
+          </div>
         </div>
-        <p className="text-sm text-zinc-500">Vui lòng tạo kịch bản trước khi tạo ảnh sản phẩm.</p>
+        <div className="text-center space-y-2 max-w-sm">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t('noContentYet')}</h3>
+          <p className="text-sm text-zinc-500 leading-relaxed">
+            {t('pleaseCreateScript')}
+          </p>
+        </div>
       </div>
     );
   }
+
+  const handleRefinePrompt = async (segmentId: string) => {
+    const instruction = viPrompts[segmentId];
+    const segment = script?.segments.find(s => s.id === segmentId);
+    if (!instruction || !segment) return;
+
+    setIsTranslating(prev => ({ ...prev, [segmentId]: true }));
+    try {
+      const refinedPrompt = await refineImagePrompt(
+        segment.imagePrompt || '', 
+        instruction,
+        script?.characterProfile || ""
+      );
+      onUpdateSegment(segmentId, { imagePrompt: refinedPrompt });
+      // Clear the instruction after successful refinement
+      setViPrompts(prev => ({ ...prev, [segmentId]: '' }));
+    } catch (error) {
+      console.error("Refinement error:", error);
+    } finally {
+      setIsTranslating(prev => ({ ...prev, [segmentId]: false }));
+    }
+  };
 
   const handleGenerateImages = async (segment: AdSegment) => {
     if (!segment.imagePrompt || !script) return;
@@ -31,8 +69,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
     try {
       // Generate both images
       const [startUrl, endUrl] = await Promise.all([
-        generateImage(segment.imagePrompt + ", start of the scene, high quality", script.productInfo.ratio),
-        generateImage(segment.imagePrompt + ", end of the scene, high quality", script.productInfo.ratio)
+        generateImage(segment.imagePrompt + ", start of the scene, high quality", "9:16"),
+        generateImage(segment.imagePrompt + ", end of the scene, high quality", "9:16")
       ]);
 
       onUpdateSegment(segment.id, { 
@@ -43,7 +81,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
       });
     } catch (error) {
       console.error("Error generating images:", error);
-      alert("Không thể tạo ảnh. Vui lòng thử lại.");
+      alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
       onUpdateSegment(segment.id, { 
         isGeneratingStart: false, 
         isGeneratingEnd: false 
@@ -57,49 +95,166 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-4 h-4" /> Chỉnh sửa câu lệnh hình ảnh
+              <Sparkles className="w-4 h-4" /> {t('editImagePrompt')}
             </h4>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl">
-              Kiểm tra và chỉnh sửa câu lệnh Gemini cho từng phân đoạn. Sau khi nhấn "Tạo ảnh", kết quả sẽ hiển thị tại tab <b>Xây dựng Video</b>.
+              {t('editImagePromptDesc')}
             </p>
           </div>
           <div className="bg-white dark:bg-zinc-900 px-4 py-2 rounded-xl border border-indigo-100 dark:border-indigo-800 shadow-sm">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Tỷ lệ khung hình</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">{t('ratio')}</span>
             <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{script.productInfo.ratio}</span>
           </div>
         </div>
       </div>
 
-      <table className="w-full text-left border-collapse min-w-[1000px]">
+      <table className="w-full text-left border-collapse min-w-[1200px]">
         <thead>
           <tr className="border-b border-zinc-200 dark:border-zinc-800">
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-12">#</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32">Phân đoạn</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-64">Nội dung (Tiếng Việt)</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Câu lệnh Gemini (Có thể sửa)</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-48 text-center">Thao tác</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32">{t('segment')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-72">{t('content')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('geminiPrompt')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32 text-center">{t('startImage')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32 text-center">{t('endImage')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-40 text-center">{t('actions')}</th>
           </tr>
         </thead>
         <tbody>
           {script.segments.map((segment) => (
-            <tr key={segment.id} className="border-b border-zinc-100 dark:border-zinc-900 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+            <tr key={segment.id} className="border-b border-zinc-100 dark:border-zinc-900 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors align-top">
               <td className="py-6 px-3 text-sm font-medium text-zinc-400">{segment.index}</td>
               <td className="py-6 px-3">
-                <span className="text-sm font-bold text-zinc-900 dark:text-white block">Phân đoạn {segment.index}</span>
+                <span className="text-sm font-bold text-zinc-900 dark:text-white block">{t('segment')} {segment.index}</span>
                 <span className="text-[10px] text-zinc-400 font-medium">{segment.startTime}s - {segment.endTime}s</span>
               </td>
-              <td className="py-6 px-3">
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                  {segment.visualDirection}
-                </p>
+              <td className="py-6 px-3 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('visualDirection')}</label>
+                  <textarea
+                    value={segment.visualDirection}
+                    onChange={(e) => onUpdateSegment(segment.id, { visualDirection: e.target.value })}
+                    className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none h-16 resize-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('voiceover')}</label>
+                  <textarea
+                    value={segment.voiceover}
+                    onChange={(e) => onUpdateSegment(segment.id, { voiceover: e.target.value })}
+                    disabled={!script.productInfo.hasVoiceover}
+                    className={`w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none h-16 resize-none ${!script.productInfo.hasVoiceover ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('onScreenText')}</label>
+                  <input
+                    type="text"
+                    value={segment.onScreenText}
+                    onChange={(e) => onUpdateSegment(segment.id, { onScreenText: e.target.value })}
+                    className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
               </td>
               <td className="py-6 px-3">
-                <textarea
-                  value={segment.imagePrompt || ''}
-                  onChange={(e) => onUpdateSegment(segment.id, { imagePrompt: e.target.value })}
-                  className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 text-[11px] font-mono text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none shadow-sm"
-                  placeholder="Nhập câu lệnh tạo ảnh..."
-                />
+                <div className="flex flex-col gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                      {language === 'vi' ? "Chỉnh sửa bằng Tiếng Việt" : "Refine with Vietnamese"}
+                    </label>
+                    <div className="relative group">
+                      <textarea
+                        value={viPrompts[segment.id] || ''}
+                        onChange={(e) => setViPrompts(prev => ({ ...prev, [segment.id]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleRefinePrompt(segment.id);
+                          }
+                        }}
+                        className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 pr-10 text-[10px] font-medium text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none shadow-sm transition-all"
+                        placeholder={language === 'vi' ? "Nhập yêu cầu chỉnh sửa (VD: thêm ánh nắng, đổi màu áo...)" : "Enter edit request (e.g. add sunlight, change shirt color...)"}
+                      />
+                      <button
+                        onClick={() => handleRefinePrompt(segment.id)}
+                        disabled={isTranslating[segment.id] || !viPrompts[segment.id]}
+                        className="absolute bottom-2 right-2 p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md disabled:opacity-50 disabled:bg-zinc-400 transition-all shadow-sm flex items-center gap-1"
+                        title={language === 'vi' ? "Nộp" : "Submit"}
+                      >
+                        {isTranslating[segment.id] ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-bold uppercase">{language === 'vi' ? "Nộp" : "Submit"}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('geminiPrompt')} (English)</label>
+                    <textarea
+                      value={segment.imagePrompt || ''}
+                      onChange={(e) => onUpdateSegment(segment.id, { imagePrompt: e.target.value })}
+                      className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none shadow-sm"
+                      placeholder="Enter image prompt in English..."
+                    />
+                  </div>
+                </div>
+              </td>
+              <td className="py-6 px-3">
+                <div className="aspect-[9/16] w-24 mx-auto bg-zinc-100 dark:bg-zinc-900 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group">
+                  {segment.startImageUrl ? (
+                    <>
+                      <img src={segment.startImageUrl} alt="Start" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = segment.startImageUrl!;
+                            a.download = `segment-${segment.index}-start.png`;
+                            a.click();
+                          }}
+                          className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </>
+                  ) : segment.isGeneratingStart ? (
+                    <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-zinc-300" />
+                  )}
+                </div>
+              </td>
+              <td className="py-6 px-3">
+                <div className="aspect-[9/16] w-24 mx-auto bg-zinc-100 dark:bg-zinc-900 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group">
+                  {segment.endImageUrl ? (
+                    <>
+                      <img src={segment.endImageUrl} alt="End" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = segment.endImageUrl!;
+                            a.download = `segment-${segment.index}-end.png`;
+                            a.click();
+                          }}
+                          className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </>
+                  ) : segment.isGeneratingEnd ? (
+                    <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-zinc-300" />
+                  )}
+                </div>
               </td>
               <td className="py-6 px-3">
                 <div className="flex flex-col items-center gap-2">
@@ -115,22 +270,22 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
                     {segment.isGeneratingStart || segment.isGeneratingEnd ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        ĐANG TẠO...
+                        {t('generating')}
                       </>
                     ) : (segment.startImageUrl && segment.endImageUrl) ? (
                       <>
                         <RefreshCw className="w-4 h-4" />
-                        TẠO LẠI ẢNH
+                        {t('regenerateImages')}
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        TẠO ẢNH
+                        {t('generateImages')}
                       </>
                     )}
                   </button>
                   {(segment.startImageUrl && segment.endImageUrl) && (
-                    <span className="text-[9px] text-emerald-500 font-bold uppercase">Đã có ảnh</span>
+                    <span className="text-[9px] text-emerald-500 font-bold uppercase">{t('imagesReady')}</span>
                   )}
                 </div>
               </td>

@@ -276,37 +276,39 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ segment, onUpdate }) => {
                   </p>
                 )}
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Chữ trên màn hình</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={segment.onScreenText}
-                    onChange={(e) => onUpdate('onScreenText', e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none"
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 italic">
-                    "{segment.onScreenText}"
-                  </p>
-                )}
-              </div>
             </div>
 
             <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Lời lồng tiếng</label>
-                {isEditing ? (
-                  <textarea
-                    value={segment.voiceover}
-                    onChange={(e) => onUpdate('voiceover', e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none h-20"
-                  />
-                ) : (
-                  <p className="text-sm text-zinc-900 dark:text-zinc-100 font-medium leading-relaxed bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                    {segment.voiceover}
-                  </p>
-                )}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-2xl space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Lời lồng tiếng</label>
+                  {isEditing ? (
+                    <textarea
+                      value={segment.voiceover}
+                      onChange={(e) => onUpdate('voiceover', e.target.value)}
+                      className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none h-20"
+                    />
+                  ) : (
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100 font-medium leading-relaxed">
+                      {segment.voiceover}
+                    </p>
+                  )}
+                </div>
+                <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Chữ trên màn hình</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={segment.onScreenText}
+                      onChange={(e) => onUpdate('onScreenText', e.target.value)}
+                      className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 italic">
+                      "{segment.onScreenText}"
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex gap-4">
                 <div className="flex-1 space-y-1">
