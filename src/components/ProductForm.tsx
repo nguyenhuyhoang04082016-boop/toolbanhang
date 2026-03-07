@@ -29,6 +29,7 @@ const initialData: ProductInfo = {
   totalLength: 32,
   hookStyle: 'problem-solution',
   ctaType: 'buy now',
+  characterType: 'real',
   voiceoverStyle: 'neutral',
   voiceoverSpeed: 'normal',
   hasVoiceover: true,
@@ -116,6 +117,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
         totalLength: 32,
         hookStyle: 'problem-solution',
         ctaType: 'buy now',
+        characterType: 'real',
         voiceoverStyle: 'female',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
@@ -143,6 +145,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
         totalLength: 32,
         hookStyle: 'problem-solution',
         ctaType: 'buy now',
+        characterType: 'real',
         voiceoverStyle: 'female',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
@@ -468,6 +471,26 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
               <option value="problem-solution">{language === 'vi' ? 'Vấn đề - Giải pháp' : 'Problem - Solution'}</option>
               <option value="testimonial">{language === 'vi' ? 'Lời chứng thực' : 'Testimonial'}</option>
             </select>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('characterType')} *</label>
+          <div className="grid grid-cols-2 gap-2">
+            {(['real', 'cartoon'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setFormData({ ...formData, characterType: type })}
+                className={`py-2 rounded-lg text-xs font-medium border transition-all ${
+                  formData.characterType === type
+                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                    : 'bg-white border-zinc-200 text-zinc-600 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400'
+                }`}
+              >
+                {type === 'real' ? t('realPerson') : t('cartoon')}
+              </button>
+            ))}
           </div>
         </div>
 

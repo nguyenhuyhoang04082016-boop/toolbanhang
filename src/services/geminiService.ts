@@ -194,6 +194,7 @@ export async function generateAdScript(
   Format: JSON array of objects.
   Language: ${language === 'vi' ? 'Vietnamese' : 'English'}.
   Tone: ${tone}.
+  Character Type: ${product.characterType === 'real' ? 'Real Person (Photorealistic)' : 'Cartoon/Animation/3D Style'}.
   Brand Voice: ${brandVoice ? 'Enabled (more professional and consistent)' : 'Disabled'}.
   Voiceover: ${product.hasVoiceover ? 'Enabled. Generate natural, persuasive dialogue.' : 'Disabled. Set voiceover to empty string.'}.
   Structure Strategy: Use AIDA (Attention, Interest, Desire, Action) or PAS (Problem, Agitation, Solution).
@@ -311,6 +312,7 @@ export async function generateCharacterProfile(product: ProductInfo): Promise<st
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   const prompt = `Based on this product and target audience, create a detailed visual description of a recurring character or mascot for the ad campaign to ensure visual consistency. 
   Product: ${product.name}
+  Character Type: ${product.characterType === 'real' ? 'Real Person' : 'Cartoon/Animation'}
   Audience: ${product.audienceDesc}
   Tone: ${product.emotion}
   
@@ -355,6 +357,7 @@ export async function generateImagePrompts(
   
   CRITICAL: Visual Consistency
   - Character Profile: ${characterProfile}
+  - Character Style: ${characterProfile.toLowerCase().includes('cartoon') || characterProfile.toLowerCase().includes('animation') ? 'Cartoon/3D Animation' : 'Photorealistic/Real Person'}
   - The character described above MUST be the main subject in every image.
   - Keep the same clothing, hair, and facial features throughout.
   - Product: ${productName}
@@ -446,6 +449,7 @@ export async function generateVideoPrompts(
   INPUT DATA:
   - Product Name: ${productName}
   - Character Profile: ${characterProfile}
+  - Character Style: ${characterProfile.toLowerCase().includes('cartoon') || characterProfile.toLowerCase().includes('animation') ? 'Cartoon/3D Animation' : 'Photorealistic/Real Person'}
   
   SEGMENTS TO ANALYZE:
   ${segments.map(s => `

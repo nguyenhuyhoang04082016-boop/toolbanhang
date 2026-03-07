@@ -33,6 +33,7 @@ export interface ProductInfo {
   totalLength: number;
   hookStyle: HookStyle;
   ctaType: CTAType;
+  characterType: 'real' | 'cartoon';
   forbiddenClaims?: string;
   
   brandName?: string;

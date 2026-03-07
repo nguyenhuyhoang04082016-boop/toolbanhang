@@ -48,7 +48,7 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
 
   // Load scenes from script or local storage
   useEffect(() => {
-    const savedScenes = sessionStorage.getItem('video_scenes');
+    const savedScenes = localStorage.getItem('video_scenes');
     if (savedScenes) {
       try {
         setScenes(JSON.parse(savedScenes));
@@ -66,11 +66,7 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
   // Sync scenes to local storage
   useEffect(() => {
     if (scenes.length > 0) {
-      try {
-  sessionStorage.setItem('video_scenes', JSON.stringify(scenes));
-} catch (e) {
-  console.error('Failed to save video scenes', e);
-}
+      localStorage.setItem('video_scenes', JSON.stringify(scenes));
     }
   }, [scenes]);
 

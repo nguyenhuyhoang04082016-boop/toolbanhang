@@ -50,14 +50,14 @@ export default function App() {
       }
     }
 
-   const savedCurrentScript = sessionStorage.getItem('current_adscript');
-if (savedCurrentScript) {
-  try {
-    setCurrentScript(JSON.parse(savedCurrentScript));
-  } catch (e) {
-    console.error('Failed to parse current script', e);
-  }
-}
+    const savedCurrentScript = localStorage.getItem('current_adscript');
+    if (savedCurrentScript) {
+      try {
+        setCurrentScript(JSON.parse(savedCurrentScript));
+      } catch (e) {
+        console.error('Failed to parse current script', e);
+      }
+    }
     
     // Check dark mode preference
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -67,41 +67,20 @@ if (savedCurrentScript) {
 
   // Sync current script to local storage
   useEffect(() => {
-  if (!currentScript) return;
-
-  try {
-    sessionStorage.setItem(
-      'current_adscript',
-      JSON.stringify(currentScript)
-    );
-  } catch (e) {
-    console.error('Failed to save current script', e);
-  }
-}, [currentScript]);
+    if (currentScript) {
+      localStorage.setItem('current_adscript', JSON.stringify(currentScript));
+    }
+  }, [currentScript]);
 
   // Sync history to local storage
- useEffect(() => {
-  try {
-    localStorage.setItem(
-      'adscript_history',
-      JSON.stringify(history.slice(0, 3))
-    );
-  } catch (e) {
-    console.error('Failed to save history', e);
-  }
-}, [history]);
+  useEffect(() => {
+    localStorage.setItem('adscript_history', JSON.stringify(history.slice(0, 5)));
+  }, [history]);
 
   // Sync templates to local storage
   useEffect(() => {
-  try {
-    localStorage.setItem(
-      'adscript_templates',
-      JSON.stringify(savedTemplates.slice(0, 20))
-    );
-  } catch (e) {
-    console.error('Failed to save templates', e);
-  }
-}, [savedTemplates]);
+    localStorage.setItem('adscript_templates', JSON.stringify(savedTemplates));
+  }, [savedTemplates]);
 
   // Apply dark mode class
   useEffect(() => {
@@ -192,6 +171,7 @@ if (savedCurrentScript) {
         totalLength: 30,
         hookStyle: 'question',
         ctaType: 'click link',
+        characterType: 'real',
         voiceoverStyle: 'neutral',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
@@ -279,6 +259,7 @@ if (savedCurrentScript) {
         totalLength: 15,
         hookStyle: 'shock',
         ctaType: 'buy now',
+        characterType: 'real',
         voiceoverStyle: 'neutral',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
