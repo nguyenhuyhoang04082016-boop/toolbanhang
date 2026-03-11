@@ -399,7 +399,7 @@ export async function generateImagePrompts(
 export async function generateImage(
   prompt: string, 
   aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9",
-  base64Image?: string
+  base64Images?: string[]
 ): Promise<string> {
   const apiKey = getApiKey('gemini');
   const aiImage = new GoogleGenAI({ apiKey });
@@ -408,15 +408,18 @@ export async function generateImage(
     try {
       const parts: any[] = [{ text: prompt }];
       
-      if (base64Image) {
-        const [header, data] = base64Image.split(',');
-        const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
-        parts.unshift({
-          inlineData: {
-            mimeType,
-            data
-          }
+      if (base64Images && base64Images.length > 0) {
+        const imageParts = base64Images.map(img => {
+          const [header, data] = img.split(',');
+          const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
+          return {
+            inlineData: {
+              mimeType,
+              data
+            }
+          };
         });
+        parts.unshift(...imageParts);
       }
 
       const response = await aiImage.models.generateContent({
