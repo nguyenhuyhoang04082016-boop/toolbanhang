@@ -185,18 +185,18 @@ export async function generateAdScript(
   language: Language,
   tone: Tone,
   brandVoice: boolean
-): Promise<AdSegment[]> {
+): Promise<{ segments: AdSegment[], seamlessScript: string }> {
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
   const systemInstruction = `You are an expert short-form ad script writer. 
-  Generate a high-converting ad script split into 8-second segments.
-  Structure: ${product.totalLength / 8} segments.
-  Format: JSON array of objects.
+  Generate a high-converting ad script split into segments of 6-8 seconds each.
+  Structure: approximately ${Math.ceil(product.totalLength / 7)} segments.
+  Format: JSON object with "segments" (array) and "seamlessScript" (string).
   Language: ${language === 'vi' ? 'Vietnamese' : 'English'}.
   Tone: ${tone}.
   Character Type: ${product.characterType === 'real' ? 'Real Person (Photorealistic)' : 'Cartoon/Animation/3D Style'}.
   Brand Voice: ${brandVoice ? 'Enabled (more professional and consistent)' : 'Disabled'}.
-  Voiceover: ${product.hasVoiceover ? 'Enabled. Generate natural, persuasive dialogue.' : 'Disabled. Set voiceover to empty string.'}.
+  Voiceover: Enabled. Generate natural, persuasive dialogue.
   Structure Strategy: Use AIDA (Attention, Interest, Desire, Action) or PAS (Problem, Agitation, Solution).
   - Segment 1: Strong hook.
   - Middle segments: Benefits, proof, objection handling.
@@ -204,12 +204,14 @@ export async function generateAdScript(
   
   Compliance: Avoid unrealistic medical claims.
   
-  Each object must have:
+  Each segment object must have:
   - visualDirection: string (what viewers see)
-  - onScreenText: string (text on screen, if allowed)
+  - onScreenText: string (text on screen)
   - voiceover: string (natural, persuasive dialogue)
   - sfx: string (short audio cues)
   - cameraNotes: string (optional camera/edit tips)
+
+  The "seamlessScript" should be the full voiceover script combined into one smooth, natural paragraph.
   `;
 
   const prompt = `
@@ -274,18 +276,25 @@ export async function generateAdScript(
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              visualDirection: { type: Type.STRING },
-              onScreenText: { type: Type.STRING },
-              voiceover: { type: Type.STRING },
-              sfx: { type: Type.STRING },
-              cameraNotes: { type: Type.STRING },
+          type: Type.OBJECT,
+          properties: {
+            segments: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  visualDirection: { type: Type.STRING },
+                  onScreenText: { type: Type.STRING },
+                  voiceover: { type: Type.STRING },
+                  sfx: { type: Type.STRING },
+                  cameraNotes: { type: Type.STRING },
+                },
+                required: ["visualDirection", "onScreenText", "voiceover", "sfx"],
+              },
             },
-            required: ["visualDirection", "onScreenText", "voiceover", "sfx"],
+            seamlessScript: { type: Type.STRING }
           },
+          required: ["segments", "seamlessScript"]
         },
       },
     });
@@ -293,15 +302,20 @@ export async function generateAdScript(
     const rawJson = response.text;
     if (!rawJson) throw new Error("No response from AI");
     
-    const segments: any[] = JSON.parse(rawJson);
+    const result = JSON.parse(rawJson);
+    const segments: any[] = result.segments;
+    const seamlessScript: string = result.seamlessScript;
     
-    return segments.map((s, i) => ({
-      ...s,
-      id: Math.random().toString(36).substr(2, 9),
-      index: i + 1,
-      startTime: i * 8,
-      endTime: (i + 1) * 8,
-    }));
+    return {
+      segments: segments.map((s, i) => ({
+        ...s,
+        id: Math.random().toString(36).substr(2, 9),
+        index: i + 1,
+        startTime: i * 8,
+        endTime: (i + 1) * 8,
+      })),
+      seamlessScript
+    };
   } catch (error) {
     console.error("Error generating script:", error);
     throw error;
@@ -779,38 +793,4 @@ export async function generateMotionPrompt(
       title: "Chuyển động điện ảnh mượt mà"
     };
   }
-}
-
-export async function analyzeVideo(videoBase64: string, mimeType: string): Promise<Partial<AdScript>> {
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
-  const prompt = `Analyze this advertisement video and extract the following information in JSON format:
-  1. Product Name and Category
-  2. Target Audience and Pain Points addressed
-  3. Key Benefits and Features shown
-  4. A detailed Character Profile of the person in the video (appearance, style, vibe)
-  5. A breakdown of the video into segments (storyboard), including:
-     - Visual Direction (what happens in the scene)
-     - On-screen text
-     - Voiceover script
-     - Estimated timing
-  
-  Format the response as a JSON object that matches the structure of an AdScript, including productInfo and segments.`;
-
-  const response = await callGeminiWithRetry({
-    model,
-    contents: [
-      {
-        parts: [
-          { text: prompt },
-          { inlineData: { data: videoBase64, mimeType } }
-        ]
-      }
-    ],
-    config: {
-      responseMimeType: "application/json",
-    }
-  });
-
-  const result = JSON.parse(response.text || "{}");
-  return result;
 }

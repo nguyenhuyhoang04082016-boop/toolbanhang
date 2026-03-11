@@ -118,6 +118,7 @@ export interface AdScript {
   language: Language;
   tone: Tone;
   segments: AdSegment[];
+  seamlessScript?: string;
   productInfo: ProductInfo;
   characterProfile?: string;
 }

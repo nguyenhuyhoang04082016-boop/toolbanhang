@@ -69,8 +69,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
     try {
       // Generate both images
       const [startUrl, endUrl] = await Promise.all([
-        generateImage(segment.imagePrompt + ", start of the scene, high quality", "9:16"),
-        generateImage(segment.imagePrompt + ", end of the scene, high quality", "9:16")
+        generateImage(segment.imagePrompt + ", start of the scene, high quality", script.productInfo.ratio),
+        generateImage(segment.imagePrompt + ", end of the scene, high quality", script.productInfo.ratio)
       ]);
 
       onUpdateSegment(segment.id, { 

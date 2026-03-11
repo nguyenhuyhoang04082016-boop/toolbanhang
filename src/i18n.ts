@@ -7,7 +7,6 @@ export const translations = {
     affiliateChannel: "Build Affiliate Channel",
     productImages: "Product Images",
     buildVideo: "Build Video",
-    spyVideo: "Spy Video",
     savedTemplates: "Saved Templates",
     
     // Usage Dashboard
@@ -99,6 +98,10 @@ export const translations = {
     musicVibe: "Music Vibe",
     generateScript: "Generate Script",
     saveTemplate: "Save Template",
+    videoConstructionScript: "Video Construction Script",
+    seamlessVoiceoverScript: "Seamless Voiceover Script",
+    segmentContent: "Segment Content",
+    scriptContent: "Script Content",
     
     // Product Images Tab
     pleaseCreateScript: "Please create an ad script first in the 'Product Info' tab.",
@@ -169,19 +172,6 @@ export const translations = {
     images: "images",
     useThisTemplate: "USE THIS TEMPLATE",
 
-    // Spy Video Tab
-    spyVideoDesc: "Upload a competitor's video for AI to extract the script, camera angles, and character style.",
-    chooseVideoToSpy: "Choose Video to 'Spy'",
-    dragAndDropVideo: "Drag and drop or click to upload (MP4, MOV, max 100MB)",
-    analyzingVideo: "Analyzing script...",
-    startAnalysis: "Start Video Analysis",
-    analysisResults: "Analysis Results",
-    useThisScript: "Use This Script",
-    aiAnalyzingVideo: "AI is watching the video and taking notes...",
-    characterProfile: "Character Profile",
-    scriptStructureLabel: "Script Structure",
-    resultsWillShowHere: "Results will appear here after analysis.",
-
     // Video Generation Tab
     exportPrompts: "Export Prompts",
     generateAllMotion: "Generate All Motion",
@@ -249,7 +239,6 @@ export const translations = {
     affiliateChannel: "Xây dựng kênh Affiliate",
     productImages: "Ảnh sản phẩm",
     buildVideo: "Xây dựng Video",
-    spyVideo: "Spy Video",
     savedTemplates: "Mẫu đã lưu",
     
     // Usage Dashboard
@@ -341,6 +330,10 @@ export const translations = {
     musicVibe: "Vibe âm nhạc",
     generateScript: "Tạo kịch bản",
     saveTemplate: "Lưu mẫu",
+    videoConstructionScript: "Kịch bản xây dựng video",
+    seamlessVoiceoverScript: "Kịch bản thoại liền mạch",
+    segmentContent: "Nội dung phân đoạn",
+    scriptContent: "Nội dung kịch bản",
     
     // Product Images Tab
     pleaseCreateScript: "Vui lòng tạo kịch bản quảng cáo trước trong tab 'Thông tin sản phẩm'.",
@@ -410,19 +403,6 @@ export const translations = {
     templates: "mẫu",
     images: "ảnh",
     useThisTemplate: "SỬ DỤNG MẪU NÀY",
-
-    // Spy Video Tab
-    spyVideoDesc: "Tải lên video đối thủ để AI bóc tách kịch bản, góc quay và phong cách nhân vật.",
-    chooseVideoToSpy: "Chọn Video để 'Spy'",
-    dragAndDropVideo: "Kéo thả hoặc click để tải lên (MP4, MOV, max 100MB)",
-    analyzingVideo: "Đang bóc tách kịch bản...",
-    startAnalysis: "Bắt đầu Phân tích Video",
-    analysisResults: "Kết quả Phân tích",
-    useThisScript: "Sử dụng Kịch bản này",
-    aiAnalyzingVideo: "AI đang xem video và ghi chép...",
-    characterProfile: "Profile Nhân vật",
-    scriptStructureLabel: "Cấu trúc Kịch bản",
-    resultsWillShowHere: "Kết quả sẽ hiển thị tại đây sau khi phân tích.",
 
     // Video Generation Tab
     exportPrompts: "Xuất Prompts",

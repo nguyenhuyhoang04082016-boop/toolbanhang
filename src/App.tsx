@@ -3,35 +3,20 @@ import { SettingsBar } from './components/SettingsBar';
 import { ProductForm } from './components/ProductForm';
 import { ProductImageTab } from './components/ProductImageTab';
 import { SavedTemplatesTab } from './components/SavedTemplatesTab';
-import { SpyVideoTab } from './components/SpyVideoTab';
+import { ScriptViewer } from './components/ScriptViewer';
 import { VideoGenerationTab } from './components/VideoGenerationTab';
 import { AffiliateChannelTab } from './components/AffiliateChannelTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
-import {
-  AdScript,
-  AdSegment,
-  Language,
-  Tone,
-  ProductInfo,
-  SavedTemplate,
-  AffiliateIdea,
-} from './types';
-import {
-  generateAdScript,
-  generateCharacterProfile,
-  generateImagePrompts,
-  generateVideoPrompts,
-} from './services/geminiService';
+import { AdScript, AdSegment, Language, Tone, ProductInfo, SavedTemplate, AffiliateIdea } from './types';
+import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateImage, generateVideoPrompts } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
-import { Info, Image as ImageIcon, Bookmark, Video, Search, Globe } from 'lucide-react';
+import { Info, Image as ImageIcon, Bookmark, Video, Globe } from 'lucide-react';
 
 import { UsageDashboard } from './components/UsageDashboard';
 import { useTranslation } from './i18n';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<
-    'form' | 'affiliate' | 'images' | 'templates' | 'video' | 'spy'
-  >('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'affiliate' | 'images' | 'templates' | 'video'>('form');
   const [language, setLanguage] = useState<Language>('vi');
   const { t } = useTranslation(language);
   const [tone, setTone] = useState<Tone>('Informative');
@@ -44,7 +29,7 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<ProductInfo | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
-  // Load history, templates, and current script
+  // Load history and saved templates from local storage
   useEffect(() => {
     const savedHistory = localStorage.getItem('adscript_history');
     if (savedHistory) {
@@ -64,7 +49,7 @@ export default function App() {
       }
     }
 
-    const savedCurrentScript = sessionStorage.getItem('current_adscript');
+    const savedCurrentScript = localStorage.getItem('current_adscript');
     if (savedCurrentScript) {
       try {
         setCurrentScript(JSON.parse(savedCurrentScript));
@@ -72,63 +57,28 @@ export default function App() {
         console.error('Failed to parse current script', e);
       }
     }
-
+    
+    // Check dark mode preference
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setDarkMode(true);
     }
   }, []);
 
-  // Sync current script to sessionStorage using lightweight data
+  // Sync current script to local storage
   useEffect(() => {
-    if (!currentScript) return;
-
-    try {
-      const lightweightScript: AdScript = {
-        id: currentScript.id,
-        timestamp: currentScript.timestamp,
-        language: currentScript.language,
-        tone: currentScript.tone,
-        productInfo: currentScript.productInfo,
-        characterProfile: currentScript.characterProfile,
-        segments: currentScript.segments.map((s) => ({
-          id: s.id,
-          index: s.index,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          visualDirection: s.visualDirection,
-          onScreenText: s.onScreenText,
-          voiceover: s.voiceover,
-          sfx: s.sfx,
-          imagePrompt: s.imagePrompt,
-          videoPrompt: s.videoPrompt,
-          cameraNotes: s.cameraNotes,
-          startImageUrl: s.startImageUrl,
-          endImageUrl: s.endImageUrl,
-        })),
-      };
-
-      sessionStorage.setItem('current_adscript', JSON.stringify(lightweightScript));
-    } catch (e) {
-      console.error('Failed to save current script', e);
+    if (currentScript) {
+      localStorage.setItem('current_adscript', JSON.stringify(currentScript));
     }
   }, [currentScript]);
 
-  // Sync history to localStorage with limit
+  // Sync history to local storage
   useEffect(() => {
-    try {
-      localStorage.setItem('adscript_history', JSON.stringify(history.slice(0, 3)));
-    } catch (e) {
-      console.error('Failed to save history', e);
-    }
+    localStorage.setItem('adscript_history', JSON.stringify(history.slice(0, 5)));
   }, [history]);
 
-  // Sync templates to localStorage with limit
+  // Sync templates to local storage
   useEffect(() => {
-    try {
-      localStorage.setItem('adscript_templates', JSON.stringify(savedTemplates.slice(0, 20)));
-    } catch (e) {
-      console.error('Failed to save templates', e);
-    }
+    localStorage.setItem('adscript_templates', JSON.stringify(savedTemplates));
   }, [savedTemplates]);
 
   // Apply dark mode class
@@ -143,17 +93,23 @@ export default function App() {
   const handleGenerate = async (product: ProductInfo) => {
     setIsLoading(true);
     setActiveTab('form');
-
     try {
-      const segments = await generateAdScript(product, language, tone, brandVoice);
+      // 1. Generate Script
+      const { segments, seamlessScript } = await generateAdScript(product, language, tone, brandVoice);
+      
+      // 2. Generate Character Profile for consistency
       const characterProfile = await generateCharacterProfile(product);
+      
+      // 3. Generate Image Prompts for each segment
       const imagePrompts = await generateImagePrompts(segments, characterProfile, product.name);
+      
+      // 3.5 Generate Video Prompts
       const videoPrompts = await generateVideoPrompts(segments, characterProfile, product.name);
-
+      
       const segmentsWithPrompts = segments.map((s, i) => ({
         ...s,
-        imagePrompt: imagePrompts[i] || '',
-        videoPrompt: videoPrompts[i] || '',
+        imagePrompt: imagePrompts[i] || "",
+        videoPrompt: videoPrompts[i] || ""
       }));
 
       const newScript: AdScript = {
@@ -162,16 +118,17 @@ export default function App() {
         language,
         tone,
         segments: segmentsWithPrompts,
+        seamlessScript,
         productInfo: product,
         characterProfile,
       };
-
+      
       setCurrentScript(newScript);
       setHistory((prev) => [newScript, ...prev].slice(0, 5));
-      setActiveTab('images');
+      setActiveTab('images'); // Switch to images tab to review prompts
+
     } catch (error: any) {
-      const errorMessage =
-        error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
+      const errorMessage = error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
       alert(errorMessage);
     } finally {
       setIsLoading(false);
@@ -179,11 +136,13 @@ export default function App() {
   };
 
   const handleUpdateSegment = (segmentId: string, updates: Partial<AdSegment>) => {
-    setCurrentScript((prev) => {
+    setCurrentScript(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        segments: prev.segments.map((s) => (s.id === segmentId ? { ...s, ...updates } : s)),
+        segments: prev.segments.map(s => 
+          s.id === segmentId ? { ...s, ...updates } : s
+        )
       };
     });
   };
@@ -216,9 +175,9 @@ export default function App() {
         voiceoverStyle: 'neutral',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
-        onScreenText: true,
+        onScreenText: true
       },
-      segments: idea.scenes.map((s) => ({
+      segments: idea.scenes.map(s => ({
         id: `${idea.id}-${s.scene}`,
         index: s.scene,
         startTime: (s.scene - 1) * 5,
@@ -228,10 +187,9 @@ export default function App() {
         voiceover: s.script,
         sfx: '',
         imagePrompt: s.imagePrompt,
-        videoPrompt: s.videoPrompt,
-      })),
+        videoPrompt: s.videoPrompt
+      }))
     };
-
     setCurrentScript(newScript);
     setActiveTab('images');
   };
@@ -239,6 +197,12 @@ export default function App() {
   const handleSendToVideo = (idea: AffiliateIdea) => {
     handleSendToImages(idea);
     setActiveTab('video');
+  };
+
+  const handleUpdateSegments = (newSegments: AdSegment[]) => {
+    if (currentScript) {
+      setCurrentScript({ ...currentScript, segments: newSegments });
+    }
   };
 
   const handleRegenerate = () => {
@@ -249,19 +213,17 @@ export default function App() {
 
   const handleSaveTemplate = (data: ProductInfo) => {
     if (!data.name) {
-      alert('Vui lòng nhập tên sản phẩm trước khi lưu mẫu.');
+      alert("Vui lòng nhập tên sản phẩm trước khi lưu mẫu.");
       return;
     }
-
     const newTemplate: SavedTemplate = {
       id: Math.random().toString(36).substr(2, 9),
       name: data.name,
       timestamp: Date.now(),
-      data: { ...data },
+      data: { ...data }
     };
-
-    setSavedTemplates((prev) => [newTemplate, ...prev].slice(0, 20));
-    alert('Đã lưu mẫu thành công!');
+    setSavedTemplates(prev => [newTemplate, ...prev]);
+    alert("Đã lưu mẫu thành công!");
   };
 
   const handleLoadTemplate = (template: SavedTemplate) => {
@@ -270,44 +232,9 @@ export default function App() {
   };
 
   const handleDeleteTemplate = (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa mẫu này?')) {
-      setSavedTemplates((prev) => prev.filter((t) => t.id !== id));
+    if (confirm("Bạn có chắc chắn muốn xóa mẫu này?")) {
+      setSavedTemplates(prev => prev.filter(t => t.id !== id));
     }
-  };
-
-  const handleUseSpyScript = (script: Partial<AdScript>) => {
-    if (!script.productInfo || !script.segments) return;
-
-    const newScript: AdScript = {
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: Date.now(),
-      language: 'vi',
-      tone: 'Informative',
-      segments: script.segments.map((s, i) => ({
-        ...s,
-        id: Math.random().toString(36).substr(2, 9),
-        index: i + 1,
-        startTime: s.startTime || i * 3,
-        endTime: s.endTime || (i + 1) * 3,
-      })) as AdSegment[],
-      productInfo: {
-        ...script.productInfo,
-        platform: 'TikTok',
-        ratio: '9:16',
-        totalLength: 15,
-        hookStyle: 'shock',
-        ctaType: 'buy now',
-        characterType: 'real',
-        voiceoverStyle: 'neutral',
-        voiceoverSpeed: 'normal',
-        hasVoiceover: true,
-        onScreenText: true,
-      } as ProductInfo,
-      characterProfile: script.characterProfile,
-    };
-
-    setCurrentScript(newScript);
-    setActiveTab('images');
   };
 
   return (
@@ -334,9 +261,9 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl max-w-xl w-full"
             >
-              <ApiKeySettings
-                onSave={() => setShowApiKeyModal(false)}
-                onCancel={() => setShowApiKeyModal(false)}
+              <ApiKeySettings 
+                onSave={() => setShowApiKeyModal(false)} 
+                onCancel={() => setShowApiKeyModal(false)} 
                 language={language}
               />
             </motion.div>
@@ -345,7 +272,9 @@ export default function App() {
       </AnimatePresence>
 
       <main className="flex flex-col min-h-[calc(100vh-64px)]">
+        {/* Main Content: Form & Images */}
         <div className="w-full bg-white dark:bg-zinc-950 flex flex-col min-h-[calc(100vh-64px)]">
+          {/* Tabs Header */}
           <div className="flex border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-950 z-40">
             <button
               onClick={() => setActiveTab('form')}
@@ -358,7 +287,6 @@ export default function App() {
               <Info className="w-4 h-4" />
               {t('productInfo')}
             </button>
-
             <button
               onClick={() => setActiveTab('affiliate')}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
@@ -370,13 +298,12 @@ export default function App() {
               <Globe className="w-4 h-4" />
               {t('affiliateChannel')}
             </button>
-
             <button
               onClick={() => setActiveTab('images')}
               disabled={!currentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed'
+                !currentScript 
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
                   : activeTab === 'images'
                     ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
                     : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -385,13 +312,12 @@ export default function App() {
               <ImageIcon className="w-4 h-4" />
               {t('productImages')}
             </button>
-
             <button
               onClick={() => setActiveTab('video')}
               disabled={!currentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed'
+                !currentScript 
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
                   : activeTab === 'video'
                     ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
                     : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -400,19 +326,6 @@ export default function App() {
               <Video className="w-4 h-4" />
               {t('buildVideo')}
             </button>
-
-            <button
-              onClick={() => setActiveTab('spy')}
-              className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'spy'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              {t('spyVideo')}
-            </button>
-
             <button
               onClick={() => setActiveTab('templates')}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
@@ -450,12 +363,11 @@ export default function App() {
                       </motion.div>
                     </div>
                   </div>
-
                   <div className="text-center space-y-2">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-                      {t('generatingScript')}
-                    </h3>
-                    <p className="text-sm text-zinc-500 max-w-xs">{t('aiAnalyzing')}</p>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t('generatingScript')}</h3>
+                    <p className="text-sm text-zinc-500 max-w-xs">
+                      {t('aiAnalyzing')}
+                    </p>
                   </div>
                 </motion.div>
               ) : (
@@ -467,17 +379,18 @@ export default function App() {
                 >
                   {activeTab === 'form' ? (
                     <div className="max-w-4xl mx-auto">
-                      <ProductForm
-                        onSubmit={handleGenerate}
+                      <ProductForm 
+                        onSubmit={handleGenerate} 
                         onSaveTemplate={handleSaveTemplate}
-                        isLoading={isLoading}
+                        isLoading={isLoading} 
                         initialValue={editingTemplate}
                         language={language}
+                        currentScript={currentScript}
                       />
                     </div>
                   ) : activeTab === 'affiliate' ? (
                     <div className="max-w-7xl mx-auto">
-                      <AffiliateChannelTab
+                      <AffiliateChannelTab 
                         language={language}
                         onSendToImages={handleSendToImages}
                         onSendToVideo={handleSendToVideo}
@@ -486,9 +399,9 @@ export default function App() {
                   ) : activeTab === 'images' ? (
                     <ApiKeyGuard language={language}>
                       <div className="max-w-6xl mx-auto">
-                        <ProductImageTab
-                          script={currentScript}
-                          onUpdateSegment={handleUpdateSegment}
+                        <ProductImageTab 
+                          script={currentScript} 
+                          onUpdateSegment={handleUpdateSegment} 
                           language={language}
                         />
                       </div>
@@ -497,15 +410,11 @@ export default function App() {
                     <ApiKeyGuard language={language}>
                       <VideoGenerationTab currentScript={currentScript} language={language} />
                     </ApiKeyGuard>
-                  ) : activeTab === 'spy' ? (
-                    <div className="max-w-6xl mx-auto">
-                      <SpyVideoTab onUseScript={handleUseSpyScript} language={language} />
-                    </div>
                   ) : (
                     <div className="max-w-4xl mx-auto">
-                      <SavedTemplatesTab
-                        templates={savedTemplates}
-                        onLoad={handleLoadTemplate}
+                      <SavedTemplatesTab 
+                        templates={savedTemplates} 
+                        onLoad={handleLoadTemplate} 
                         onDelete={handleDeleteTemplate}
                         language={language}
                       />

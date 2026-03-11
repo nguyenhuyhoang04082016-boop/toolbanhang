@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ProductInfo, Platform, VideoRatio, HookStyle, CTAType, VoiceoverStyle, VoiceoverSpeed, Language } from '../types';
-import { Info, Plus, X, AlertCircle, Sparkles, Save, Upload, Image as ImageIcon } from 'lucide-react';
+import { ProductInfo, Platform, VideoRatio, HookStyle, CTAType, VoiceoverStyle, VoiceoverSpeed, Language, AdScript } from '../types';
+import { Info, Plus, X, AlertCircle, Sparkles, Save, Upload, Image as ImageIcon, Video } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 interface ProductFormProps {
@@ -9,6 +9,7 @@ interface ProductFormProps {
   isLoading: boolean;
   initialValue?: ProductInfo | null;
   language: Language;
+  currentScript?: AdScript | null;
 }
 
 const initialData: ProductInfo = {
@@ -39,7 +40,7 @@ const initialData: ProductInfo = {
 const benefitOptionsVi = ['Tiết kiệm thời gian', 'Tiết kiệm chi phí', 'Chất lượng cao', 'Thân thiện môi trường', 'Dễ sử dụng', 'Sáng tạo'];
 const benefitOptionsEn = ['Time-saving', 'Cost-saving', 'High quality', 'Eco-friendly', 'Easy to use', 'Creative'];
 
-export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTemplate, isLoading, initialValue, language }) => {
+export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTemplate, isLoading, initialValue, language, currentScript }) => {
   const [formData, setFormData] = useState<ProductInfo>(initialData);
   const { t } = useTranslation(language);
   const [featureInput, setFeatureInput] = useState('');
@@ -561,37 +562,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('hasVoiceover')}?</label>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, hasVoiceover: !formData.hasVoiceover })}
-              className={`w-12 h-6 rounded-full transition-all relative ${
-                formData.hasVoiceover ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
-              }`}
-            >
-              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                formData.hasVoiceover ? 'left-7' : 'left-1'
-              }`} />
-            </button>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('onScreenText')}?</label>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, onScreenText: !formData.onScreenText })}
-              className={`w-12 h-6 rounded-full transition-all relative ${
-                formData.onScreenText ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
-              }`}
-            >
-              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                formData.onScreenText ? 'left-7' : 'left-1'
-              }`} />
-            </button>
-          </div>
-        </div>
-
         <div className="space-y-1">
           <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('musicVibe')} ({language === 'vi' ? 'Opt' : 'Optional'})</label>
           <input
@@ -704,6 +674,50 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
           )}
         </button>
       </div>
+
+      {/* Script Tables Section */}
+      {currentScript && (
+        <div className="mt-12 space-y-12 pb-24">
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+              <Video className="w-5 h-5 text-indigo-500" />
+              {t('videoConstructionScript')}
+            </h3>
+            <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 uppercase text-[10px] font-bold tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3 w-16">#</th>
+                    <th className="px-4 py-3">{t('visualDirection')}</th>
+                    <th className="px-4 py-3">{t('voiceover')}</th>
+                    <th className="px-4 py-3">SFX</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {currentScript.segments.map((segment) => (
+                    <tr key={segment.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                      <td className="px-4 py-4 font-mono text-zinc-400">{segment.index}</td>
+                      <td className="px-4 py-4 text-zinc-700 dark:text-zinc-300">{segment.visualDirection}</td>
+                      <td className="px-4 py-4 text-zinc-600 dark:text-zinc-400 italic">"{segment.voiceover}"</td>
+                      <td className="px-4 py-4 text-zinc-500">{segment.sfx}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-indigo-500" />
+              {t('seamlessVoiceoverScript')}
+            </h3>
+            <div className="p-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
+              {currentScript.seamlessScript}
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };
