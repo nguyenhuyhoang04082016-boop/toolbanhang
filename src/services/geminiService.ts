@@ -396,20 +396,33 @@ export async function generateImagePrompts(
   return JSON.parse(response.text || "[]");
 }
 
-export async function generateImage(prompt: string, aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9"): Promise<string> {
+export async function generateImage(
+  prompt: string, 
+  aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9",
+  base64Image?: string
+): Promise<string> {
   const apiKey = getApiKey('gemini');
   const aiImage = new GoogleGenAI({ apiKey });
 
   return apiQueue.add(async () => {
     try {
+      const parts: any[] = [{ text: prompt }];
+      
+      if (base64Image) {
+        const [header, data] = base64Image.split(',');
+        const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
+        parts.unshift({
+          inlineData: {
+            mimeType,
+            data
+          }
+        });
+      }
+
       const response = await aiImage.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
+          parts,
         },
         config: {
           imageConfig: {
