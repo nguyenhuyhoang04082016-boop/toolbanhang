@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AdScript, AdSegment, Language } from '../types';
-import { Image as ImageIcon, Sparkles, Loader2, RefreshCw, Download, Languages, Send } from 'lucide-react';
+import { Image as ImageIcon, Sparkles, Loader2, RefreshCw, Download, Languages, Send, Upload, X as XIcon } from 'lucide-react';
 import { generateImage, refineImagePrompt } from '../services/geminiService';
 import { useTranslation } from '../i18n';
 
@@ -14,6 +14,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
   const { t } = useTranslation(language);
   const [viPrompts, setViPrompts] = useState<Record<string, string>>({});
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({});
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
   if (!script) {
     return (
@@ -58,6 +59,17 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
     }
   };
 
+  const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReferenceImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleGenerateImages = async (segment: AdSegment) => {
     if (!segment.imagePrompt || !script) return;
     
@@ -69,8 +81,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
     try {
       // Generate both images
       const [startUrl, endUrl] = await Promise.all([
-        generateImage(segment.imagePrompt + ", start of the scene, high quality", script.productInfo.ratio),
-        generateImage(segment.imagePrompt + ", end of the scene, high quality", script.productInfo.ratio)
+        generateImage(segment.imagePrompt + ", start of the scene, high quality", script.productInfo.ratio, referenceImage || undefined),
+        generateImage(segment.imagePrompt + ", end of the scene, high quality", script.productInfo.ratio, referenceImage || undefined)
       ]);
 
       onUpdateSegment(segment.id, { 
@@ -90,8 +102,45 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
   };
 
   return (
-    <div className="p-4 overflow-x-auto">
-      <div className="mb-6 p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl">
+    <div className="p-4 overflow-x-auto space-y-6">
+      {/* Reference Image Upload Section */}
+      <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-sm">
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="flex-1 space-y-2">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+              <Upload className="w-5 h-5 text-indigo-500" />
+              {t('productReferenceImage')}
+            </h3>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              {t('uploadReferenceDesc')}
+            </p>
+          </div>
+          
+          <div className="w-full md:w-64">
+            {referenceImage ? (
+              <div className="relative aspect-square rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group">
+                <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <button 
+                  onClick={() => setReferenceImage(null)}
+                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition-all group">
+                <div className="w-12 h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <Upload className="w-6 h-6 text-zinc-400" />
+                </div>
+                <span className="text-xs font-bold text-zinc-500">{language === 'vi' ? 'Tải lên ảnh gốc' : 'Upload Reference'}</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
+              </label>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-2">
