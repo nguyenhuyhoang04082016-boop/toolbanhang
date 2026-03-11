@@ -3,17 +3,97 @@ import { SettingsBar } from './components/SettingsBar';
 import { ProductForm } from './components/ProductForm';
 import { ProductImageTab } from './components/ProductImageTab';
 import { SavedTemplatesTab } from './components/SavedTemplatesTab';
-import { ScriptViewer } from './components/ScriptViewer';
 import { VideoGenerationTab } from './components/VideoGenerationTab';
 import { AffiliateChannelTab } from './components/AffiliateChannelTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
 import { AdScript, AdSegment, Language, Tone, ProductInfo, SavedTemplate, AffiliateIdea } from './types';
-import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateImage, generateVideoPrompts } from './services/geminiService';
+import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateVideoPrompts } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Info, Image as ImageIcon, Bookmark, Video, Globe } from 'lucide-react';
-
 import { UsageDashboard } from './components/UsageDashboard';
 import { useTranslation } from './i18n';
+
+const STORAGE_KEYS = {
+  CURRENT: 'current_adscript',
+  HISTORY: 'adscript_history',
+  TEMPLATES: 'adscript_templates',
+};
+
+const MAX_HISTORY_ITEMS = 5;
+const MAX_LOCALSTORAGE_ITEM_SIZE = 2_000_000; // ~2MB để chừa khoảng trống an toàn
+
+function getStringSize(value: string) {
+  return new Blob([value]).size;
+}
+
+function safeParseJSON<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch (error) {
+    console.error('Failed to parse JSON from localStorage:', error);
+    return fallback;
+  }
+}
+
+function safeRemoveLocalStorage(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.warn(`Failed to remove localStorage key: ${key}`, error);
+  }
+}
+
+function safeSetLocalStorage(key: string, value: unknown) {
+  try {
+    const serialized = JSON.stringify(value);
+    const size = getStringSize(serialized);
+
+    if (size > MAX_LOCALSTORAGE_ITEM_SIZE) {
+      console.warn(`Skipped saving "${key}" because payload is too large: ${size} bytes`);
+      return false;
+    }
+
+    localStorage.setItem(key, serialized);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to save localStorage key: ${key}`, error);
+    return false;
+  }
+}
+
+function buildLightweightScript(script: AdScript): Partial<AdScript> {
+  return {
+    id: script.id,
+    timestamp: script.timestamp,
+    language: script.language,
+    tone: script.tone,
+    seamlessScript: script.seamlessScript,
+    productInfo: script.productInfo,
+    characterProfile:
+      typeof script.characterProfile === 'string'
+        ? script.characterProfile.slice(0, 3000)
+        : script.characterProfile,
+    segments: script.segments.map((segment) => ({
+      ...segment,
+      imagePrompt: segment.imagePrompt ? segment.imagePrompt.slice(0, 1200) : '',
+      videoPrompt: segment.videoPrompt ? segment.videoPrompt.slice(0, 1200) : '',
+    })),
+  };
+}
+
+function sanitizeHistory(history: AdScript[]) {
+  return history.slice(0, MAX_HISTORY_ITEMS).map((item) => buildLightweightScript(item));
+}
+
+function sanitizeTemplates(templates: SavedTemplate[]) {
+  return templates.map((template) => ({
+    ...template,
+    data: {
+      ...template.data,
+    },
+  }));
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'form' | 'affiliate' | 'images' | 'templates' | 'video'>('form');
@@ -29,59 +109,62 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<ProductInfo | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
-  // Load history and saved templates from local storage
   useEffect(() => {
-    const savedHistory = localStorage.getItem('adscript_history');
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error('Failed to parse history', e);
-      }
-    }
+    const savedHistory = safeParseJSON<AdScript[]>(localStorage.getItem(STORAGE_KEYS.HISTORY), []);
+    setHistory(savedHistory);
 
-    const savedTmpls = localStorage.getItem('adscript_templates');
-    if (savedTmpls) {
-      try {
-        setSavedTemplates(JSON.parse(savedTmpls));
-      } catch (e) {
-        console.error('Failed to parse templates', e);
-      }
-    }
+    const savedTmpls = safeParseJSON<SavedTemplate[]>(localStorage.getItem(STORAGE_KEYS.TEMPLATES), []);
+    setSavedTemplates(savedTmpls);
 
-    const savedCurrentScript = localStorage.getItem('current_adscript');
-    if (savedCurrentScript) {
-      try {
-        setCurrentScript(JSON.parse(savedCurrentScript));
-      } catch (e) {
-        console.error('Failed to parse current script', e);
-      }
-    }
-    
-    // Check dark mode preference
+    const savedCurrentScript = safeParseJSON<AdScript | null>(
+      localStorage.getItem(STORAGE_KEYS.CURRENT),
+      null
+    );
+    setCurrentScript(savedCurrentScript);
+
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setDarkMode(true);
     }
   }, []);
 
-  // Sync current script to local storage
   useEffect(() => {
-    if (currentScript) {
-      localStorage.setItem('current_adscript', JSON.stringify(currentScript));
+    if (!currentScript) {
+      safeRemoveLocalStorage(STORAGE_KEYS.CURRENT);
+      return;
+    }
+
+    const savedFull = safeSetLocalStorage(STORAGE_KEYS.CURRENT, currentScript);
+
+    if (!savedFull) {
+      const lightweight = buildLightweightScript(currentScript);
+      const savedLite = safeSetLocalStorage(STORAGE_KEYS.CURRENT, lightweight);
+
+      if (!savedLite) {
+        console.warn('Could not save current script even after reducing payload');
+      }
     }
   }, [currentScript]);
 
-  // Sync history to local storage
   useEffect(() => {
-    localStorage.setItem('adscript_history', JSON.stringify(history.slice(0, 5)));
+    const cleanedHistory = sanitizeHistory(history);
+    const saved = safeSetLocalStorage(STORAGE_KEYS.HISTORY, cleanedHistory);
+
+    if (!saved) {
+      const fallbackHistory = cleanedHistory.slice(0, 2);
+      safeSetLocalStorage(STORAGE_KEYS.HISTORY, fallbackHistory);
+    }
   }, [history]);
 
-  // Sync templates to local storage
   useEffect(() => {
-    localStorage.setItem('adscript_templates', JSON.stringify(savedTemplates));
+    const cleanedTemplates = sanitizeTemplates(savedTemplates);
+    const saved = safeSetLocalStorage(STORAGE_KEYS.TEMPLATES, cleanedTemplates);
+
+    if (!saved) {
+      const fallbackTemplates = cleanedTemplates.slice(0, 10);
+      safeSetLocalStorage(STORAGE_KEYS.TEMPLATES, fallbackTemplates);
+    }
   }, [savedTemplates]);
 
-  // Apply dark mode class
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -93,27 +176,21 @@ export default function App() {
   const handleGenerate = async (product: ProductInfo) => {
     setIsLoading(true);
     setActiveTab('form');
+
     try {
-      // 1. Generate Script
       const { segments, seamlessScript } = await generateAdScript(product, language, tone, brandVoice);
-      
-      // 2. Generate Character Profile for consistency
       const characterProfile = await generateCharacterProfile(product);
-      
-      // 3. Generate Image Prompts for each segment
       const imagePrompts = await generateImagePrompts(segments, characterProfile, product.name);
-      
-      // 3.5 Generate Video Prompts
       const videoPrompts = await generateVideoPrompts(segments, characterProfile, product.name);
-      
+
       const segmentsWithPrompts = segments.map((s, i) => ({
         ...s,
-        imagePrompt: imagePrompts[i] || "",
-        videoPrompt: videoPrompts[i] || ""
+        imagePrompt: imagePrompts[i] || '',
+        videoPrompt: videoPrompts[i] || '',
       }));
 
       const newScript: AdScript = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).slice(2, 11),
         timestamp: Date.now(),
         language,
         tone,
@@ -122,13 +199,14 @@ export default function App() {
         productInfo: product,
         characterProfile,
       };
-      
-      setCurrentScript(newScript);
-      setHistory((prev) => [newScript, ...prev].slice(0, 5));
-      setActiveTab('images'); // Switch to images tab to review prompts
 
+      setCurrentScript(newScript);
+      setHistory((prev) => [newScript, ...prev].slice(0, MAX_HISTORY_ITEMS));
+      setActiveTab('images');
     } catch (error: any) {
-      const errorMessage = error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
+      console.error('Generate script error:', error);
+      const errorMessage =
+        error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
       alert(errorMessage);
     } finally {
       setIsLoading(false);
@@ -136,13 +214,11 @@ export default function App() {
   };
 
   const handleUpdateSegment = (segmentId: string, updates: Partial<AdSegment>) => {
-    setCurrentScript(prev => {
+    setCurrentScript((prev) => {
       if (!prev) return null;
       return {
         ...prev,
-        segments: prev.segments.map(s => 
-          s.id === segmentId ? { ...s, ...updates } : s
-        )
+        segments: prev.segments.map((s) => (s.id === segmentId ? { ...s, ...updates } : s)),
       };
     });
   };
@@ -151,7 +227,7 @@ export default function App() {
     const newScript: AdScript = {
       id: idea.id,
       timestamp: Date.now(),
-      language: language,
+      language,
       tone: 'Informative',
       productInfo: {
         name: idea.conceptTitle,
@@ -175,9 +251,9 @@ export default function App() {
         voiceoverStyle: 'neutral',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
-        onScreenText: true
+        onScreenText: true,
       },
-      segments: idea.scenes.map(s => ({
+      segments: idea.scenes.map((s) => ({
         id: `${idea.id}-${s.scene}`,
         index: s.scene,
         startTime: (s.scene - 1) * 5,
@@ -187,9 +263,10 @@ export default function App() {
         voiceover: s.script,
         sfx: '',
         imagePrompt: s.imagePrompt,
-        videoPrompt: s.videoPrompt
-      }))
+        videoPrompt: s.videoPrompt,
+      })),
     };
+
     setCurrentScript(newScript);
     setActiveTab('images');
   };
@@ -197,12 +274,6 @@ export default function App() {
   const handleSendToVideo = (idea: AffiliateIdea) => {
     handleSendToImages(idea);
     setActiveTab('video');
-  };
-
-  const handleUpdateSegments = (newSegments: AdSegment[]) => {
-    if (currentScript) {
-      setCurrentScript({ ...currentScript, segments: newSegments });
-    }
   };
 
   const handleRegenerate = () => {
@@ -213,17 +284,19 @@ export default function App() {
 
   const handleSaveTemplate = (data: ProductInfo) => {
     if (!data.name) {
-      alert("Vui lòng nhập tên sản phẩm trước khi lưu mẫu.");
+      alert('Vui lòng nhập tên sản phẩm trước khi lưu mẫu.');
       return;
     }
+
     const newTemplate: SavedTemplate = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).slice(2, 11),
       name: data.name,
       timestamp: Date.now(),
-      data: { ...data }
+      data: { ...data },
     };
-    setSavedTemplates(prev => [newTemplate, ...prev]);
-    alert("Đã lưu mẫu thành công!");
+
+    setSavedTemplates((prev) => [newTemplate, ...prev]);
+    alert('Đã lưu mẫu thành công!');
   };
 
   const handleLoadTemplate = (template: SavedTemplate) => {
@@ -232,8 +305,8 @@ export default function App() {
   };
 
   const handleDeleteTemplate = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa mẫu này?")) {
-      setSavedTemplates(prev => prev.filter(t => t.id !== id));
+    if (confirm('Bạn có chắc chắn muốn xóa mẫu này?')) {
+      setSavedTemplates((prev) => prev.filter((t) => t.id !== id));
     }
   };
 
@@ -261,9 +334,9 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl max-w-xl w-full"
             >
-              <ApiKeySettings 
-                onSave={() => setShowApiKeyModal(false)} 
-                onCancel={() => setShowApiKeyModal(false)} 
+              <ApiKeySettings
+                onSave={() => setShowApiKeyModal(false)}
+                onCancel={() => setShowApiKeyModal(false)}
                 language={language}
               />
             </motion.div>
@@ -272,9 +345,7 @@ export default function App() {
       </AnimatePresence>
 
       <main className="flex flex-col min-h-[calc(100vh-64px)]">
-        {/* Main Content: Form & Images */}
         <div className="w-full bg-white dark:bg-zinc-950 flex flex-col min-h-[calc(100vh-64px)]">
-          {/* Tabs Header */}
           <div className="flex border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-950 z-40">
             <button
               onClick={() => setActiveTab('form')}
@@ -287,6 +358,7 @@ export default function App() {
               <Info className="w-4 h-4" />
               {t('productInfo')}
             </button>
+
             <button
               onClick={() => setActiveTab('affiliate')}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
@@ -298,12 +370,13 @@ export default function App() {
               <Globe className="w-4 h-4" />
               {t('affiliateChannel')}
             </button>
+
             <button
               onClick={() => setActiveTab('images')}
               disabled={!currentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript 
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
+                !currentScript
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed'
                   : activeTab === 'images'
                     ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
                     : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -312,12 +385,13 @@ export default function App() {
               <ImageIcon className="w-4 h-4" />
               {t('productImages')}
             </button>
+
             <button
               onClick={() => setActiveTab('video')}
               disabled={!currentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript 
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
+                !currentScript
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed'
                   : activeTab === 'video'
                     ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
                     : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -326,6 +400,7 @@ export default function App() {
               <Video className="w-4 h-4" />
               {t('buildVideo')}
             </button>
+
             <button
               onClick={() => setActiveTab('templates')}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
@@ -363,11 +438,10 @@ export default function App() {
                       </motion.div>
                     </div>
                   </div>
+
                   <div className="text-center space-y-2">
                     <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t('generatingScript')}</h3>
-                    <p className="text-sm text-zinc-500 max-w-xs">
-                      {t('aiAnalyzing')}
-                    </p>
+                    <p className="text-sm text-zinc-500 max-w-xs">{t('aiAnalyzing')}</p>
                   </div>
                 </motion.div>
               ) : (
@@ -379,10 +453,10 @@ export default function App() {
                 >
                   {activeTab === 'form' ? (
                     <div className="max-w-4xl mx-auto">
-                      <ProductForm 
-                        onSubmit={handleGenerate} 
+                      <ProductForm
+                        onSubmit={handleGenerate}
                         onSaveTemplate={handleSaveTemplate}
-                        isLoading={isLoading} 
+                        isLoading={isLoading}
                         initialValue={editingTemplate}
                         language={language}
                         currentScript={currentScript}
@@ -390,7 +464,7 @@ export default function App() {
                     </div>
                   ) : activeTab === 'affiliate' ? (
                     <div className="max-w-7xl mx-auto">
-                      <AffiliateChannelTab 
+                      <AffiliateChannelTab
                         language={language}
                         onSendToImages={handleSendToImages}
                         onSendToVideo={handleSendToVideo}
@@ -399,9 +473,9 @@ export default function App() {
                   ) : activeTab === 'images' ? (
                     <ApiKeyGuard language={language}>
                       <div className="max-w-6xl mx-auto">
-                        <ProductImageTab 
-                          script={currentScript} 
-                          onUpdateSegment={handleUpdateSegment} 
+                        <ProductImageTab
+                          script={currentScript}
+                          onUpdateSegment={handleUpdateSegment}
                           language={language}
                         />
                       </div>
@@ -412,9 +486,9 @@ export default function App() {
                     </ApiKeyGuard>
                   ) : (
                     <div className="max-w-4xl mx-auto">
-                      <SavedTemplatesTab 
-                        templates={savedTemplates} 
-                        onLoad={handleLoadTemplate} 
+                      <SavedTemplatesTab
+                        templates={savedTemplates}
+                        onLoad={handleLoadTemplate}
                         onDelete={handleDeleteTemplate}
                         language={language}
                       />
