@@ -14,7 +14,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
   const { t } = useTranslation(language);
   const [viPrompts, setViPrompts] = useState<Record<string, string>>({});
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({});
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
   if (!script) {
     return (
@@ -60,14 +60,28 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
   };
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReferenceImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files) {
+      const newImages: string[] = [];
+      const fileList = Array.from(files) as File[];
+      
+      let processed = 0;
+      fileList.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newImages.push(reader.result as string);
+          processed++;
+          if (processed === fileList.length) {
+            setReferenceImages(prev => [...prev, ...newImages].slice(0, 5)); // Limit to 5 images
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
+  };
+
+  const removeReferenceImage = (index: number) => {
+    setReferenceImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleGenerateImages = async (segment: AdSegment) => {
@@ -81,8 +95,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
     try {
       // Generate both images
       const [startUrl, endUrl] = await Promise.all([
-        generateImage(segment.imagePrompt + ", start of the scene, high quality", script.productInfo.ratio, referenceImage || undefined),
-        generateImage(segment.imagePrompt + ", end of the scene, high quality", script.productInfo.ratio, referenceImage || undefined)
+        generateImage(segment.imagePrompt + ", start of the scene, high quality", script.productInfo.ratio, referenceImages.length > 0 ? referenceImages : undefined),
+        generateImage(segment.imagePrompt + ", end of the scene, high quality", script.productInfo.ratio, referenceImages.length > 0 ? referenceImages : undefined)
       ]);
 
       onUpdateSegment(segment.id, { 
@@ -112,30 +126,34 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
               {t('productReferenceImage')}
             </h3>
             <p className="text-sm text-zinc-500 leading-relaxed">
-              {t('uploadReferenceDesc')}
+              {t('uploadReferenceDesc')} (Max 5)
             </p>
           </div>
           
-          <div className="w-full md:w-64">
-            {referenceImage ? (
-              <div className="relative aspect-square rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group">
-                <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                <button 
-                  onClick={() => setReferenceImage(null)}
-                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <label className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition-all group">
-                <div className="w-12 h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                  <Upload className="w-6 h-6 text-zinc-400" />
+          <div className="w-full md:w-2/3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {referenceImages.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group">
+                  <img src={img} alt={`Reference ${idx}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <button 
+                    onClick={() => removeReferenceImage(idx)}
+                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
                 </div>
-                <span className="text-xs font-bold text-zinc-500">{language === 'vi' ? 'Tải lên ảnh gốc' : 'Upload Reference'}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
-              </label>
-            )}
+              ))}
+              
+              {referenceImages.length < 5 && (
+                <label className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition-all group">
+                  <div className="w-10 h-10 bg-zinc-50 dark:bg-zinc-800 rounded-xl flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                    <Upload className="w-5 h-5 text-zinc-400" />
+                  </div>
+                  <span className="text-[10px] font-bold text-zinc-500">{language === 'vi' ? 'Thêm ảnh' : 'Add Image'}</span>
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handleReferenceUpload} />
+                </label>
+              )}
+            </div>
           </div>
         </div>
       </div>
