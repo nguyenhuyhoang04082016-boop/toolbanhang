@@ -102,6 +102,8 @@ export const translations = {
     seamlessVoiceoverScript: "Seamless Voiceover Script",
     segmentContent: "Segment Content",
     scriptContent: "Script Content",
+    productReferenceImage: "Product Reference Image",
+    uploadReferenceDesc: "Upload a reference image of your product. All generated images will be based on this image and the AI prompt.",
     
     // Product Images Tab
     pleaseCreateScript: "Please create an ad script first in the 'Product Info' tab.",
@@ -334,6 +336,8 @@ export const translations = {
     seamlessVoiceoverScript: "Kịch bản thoại liền mạch",
     segmentContent: "Nội dung phân đoạn",
     scriptContent: "Nội dung kịch bản",
+    productReferenceImage: "Ảnh sản phẩm gốc",
+    uploadReferenceDesc: "Tải lên ảnh gốc của sản phẩm. Tất cả ảnh được tạo sẽ dựa trên ảnh này và câu lệnh AI.",
     
     // Product Images Tab
     pleaseCreateScript: "Vui lòng tạo kịch bản quảng cáo trước trong tab 'Thông tin sản phẩm'.",
