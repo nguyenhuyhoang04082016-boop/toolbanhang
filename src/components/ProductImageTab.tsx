@@ -7,10 +7,18 @@ import { useTranslation } from '../i18n';
 interface ProductImageTabProps {
   script: AdScript | null;
   onUpdateSegment: (segmentId: string, updates: Partial<AdSegment>) => void;
+  onGenerateAnother: () => void;
   language: Language;
+  isGenerating?: boolean;
 }
 
-export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpdateSegment, language }) => {
+export const ProductImageTab: React.FC<ProductImageTabProps> = ({ 
+  script, 
+  onUpdateSegment, 
+  onGenerateAnother,
+  language,
+  isGenerating = false
+}) => {
   const { t } = useTranslation(language);
   const [viPrompts, setViPrompts] = useState<Record<string, string>>({});
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({});
@@ -158,6 +166,31 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
         </div>
       </div>
 
+      {/* Script Display Section */}
+      <div className="p-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-indigo-500" />
+            {t('seamlessVoiceoverScript')}
+          </h3>
+          <button
+            onClick={onGenerateAnother}
+            disabled={isGenerating}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition-all disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            {t('createAnotherScript')}
+          </button>
+        </div>
+        <div className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap italic">
+          "{script.seamlessScript}"
+        </div>
+      </div>
+
       <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
@@ -180,8 +213,9 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
           <tr className="border-b border-zinc-200 dark:border-zinc-800">
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-12">#</th>
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32">{t('segment')}</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-72">{t('content')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-64">{t('content')}</th>
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('geminiPrompt')}</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('veo3Prompt')}</th>
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32 text-center">{t('startImage')}</th>
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-32 text-center">{t('endImage')}</th>
             <th className="py-4 px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-40 text-center">{t('actions')}</th>
@@ -201,25 +235,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
                   <textarea
                     value={segment.visualDirection}
                     onChange={(e) => onUpdateSegment(segment.id, { visualDirection: e.target.value })}
-                    className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none h-16 resize-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('voiceover')}</label>
-                  <textarea
-                    value={segment.voiceover}
-                    onChange={(e) => onUpdateSegment(segment.id, { voiceover: e.target.value })}
-                    disabled={!script.productInfo.hasVoiceover}
-                    className={`w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none h-16 resize-none ${!script.productInfo.hasVoiceover ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('onScreenText')}</label>
-                  <input
-                    type="text"
-                    value={segment.onScreenText}
-                    onChange={(e) => onUpdateSegment(segment.id, { onScreenText: e.target.value })}
-                    className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] text-zinc-600 dark:text-zinc-400 focus:ring-1 focus:ring-indigo-500 outline-none h-24 resize-none"
                   />
                 </div>
               </td>
@@ -269,6 +285,17 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({ script, onUpda
                       placeholder="Enter image prompt in English..."
                     />
                   </div>
+                </div>
+              </td>
+              <td className="py-6 px-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{t('veo3Prompt')}</label>
+                  <textarea
+                    value={segment.videoPrompt || ''}
+                    onChange={(e) => onUpdateSegment(segment.id, { videoPrompt: e.target.value })}
+                    className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-44 resize-none shadow-sm"
+                    placeholder="Enter Veo 3 prompt..."
+                  />
                 </div>
               </td>
               <td className="py-6 px-3">
