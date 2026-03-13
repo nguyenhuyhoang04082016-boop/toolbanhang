@@ -18,6 +18,7 @@ export interface ProductInfo {
   sizes?: string;
   price: number;
   currency: string;
+  showPrice: boolean;
   promotion?: string;
   stock?: string;
   shipping?: string;
