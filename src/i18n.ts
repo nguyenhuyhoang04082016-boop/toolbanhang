@@ -83,6 +83,7 @@ export const translations = {
     hookStyle: "Hook Style",
     ctaType: "CTA Type",
     forbiddenClaims: "Forbidden Claims",
+    showPrice: "Show Price",
     characterType: "Character Type",
     realPerson: "Real Person",
     cartoon: "Cartoon/Animation",
@@ -121,6 +122,8 @@ export const translations = {
     regenerateImages: "Regenerate Images",
     generateImages: "Generate Images",
     imagesReady: "Images are ready for your video!",
+    createAnotherScript: "Create Another Script",
+    veo3Prompt: "Veo 3 Prompt",
     startImage: "Start Image",
     endImage: "End Image",
 
@@ -317,6 +320,7 @@ export const translations = {
     hookStyle: "Kiểu Hook",
     ctaType: "Kiểu CTA",
     forbiddenClaims: "Cam kết cấm",
+    showPrice: "Hiện giá sản phẩm",
     characterType: "Loại nhân vật",
     realPerson: "Người thật",
     cartoon: "Hoạt hình/3D",
@@ -355,6 +359,8 @@ export const translations = {
     regenerateImages: "Tạo lại ảnh",
     generateImages: "Tạo ảnh",
     imagesReady: "Ảnh đã sẵn sàng cho video của bạn!",
+    createAnotherScript: "Tạo kịch bản khác",
+    veo3Prompt: "Câu lệnh Veo 3",
     startImage: "Ảnh đầu",
     endImage: "Ảnh cuối",
 
