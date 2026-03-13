@@ -1,171 +1,154 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Info, Image as ImageIcon, Bookmark, Globe } from 'lucide-react';
+
 import { SettingsBar } from './components/SettingsBar';
 import { ProductForm } from './components/ProductForm';
 import { ProductImageTab } from './components/ProductImageTab';
 import { SavedTemplatesTab } from './components/SavedTemplatesTab';
-import { VideoGenerationTab } from './components/VideoGenerationTab';
 import { AffiliateChannelTab } from './components/AffiliateChannelTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
-import { AdScript, AdSegment, Language, Tone, ProductInfo, SavedTemplate, AffiliateIdea } from './types';
-import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateVideoPrompts } from './services/geminiService';
-import { motion, AnimatePresence } from 'motion/react';
-import { Info, Image as ImageIcon, Bookmark, Video, Globe } from 'lucide-react';
 import { UsageDashboard } from './components/UsageDashboard';
+
+import {
+  AdScript,
+  AdSegment,
+  Language,
+  Tone,
+  ProductInfo,
+  SavedTemplate,
+  AffiliateIdea,
+} from './types';
+import {
+  generateAdScript,
+  generateCharacterProfile,
+  generateImagePrompts,
+  generateVideoPrompts,
+} from './services/geminiService';
 import { useTranslation } from './i18n';
 
+type AppTab = 'form' | 'affiliate' | 'images' | 'templates';
+
 const STORAGE_KEYS = {
-  CURRENT: 'current_adscript',
-  HISTORY: 'adscript_history',
-  TEMPLATES: 'adscript_templates',
-};
+  history: 'adscript_history',
+  templates: 'adscript_templates',
+  currentScript: 'current_adscript',
+} as const;
 
 const MAX_HISTORY_ITEMS = 5;
-const MAX_LOCALSTORAGE_ITEM_SIZE = 2_000_000; // ~2MB để chừa khoảng trống an toàn
 
-function getStringSize(value: string) {
-  return new Blob([value]).size;
-}
+const createId = () => Math.random().toString(36).slice(2, 11);
 
-function safeParseJSON<T>(value: string | null, fallback: T): T {
+const safeParseJSON = <T,>(value: string | null, fallback: T): T => {
   if (!value) return fallback;
   try {
     return JSON.parse(value) as T;
   } catch (error) {
-    console.error('Failed to parse JSON from localStorage:', error);
+    console.error('Failed to parse JSON:', error);
     return fallback;
   }
-}
+};
 
-function safeRemoveLocalStorage(key: string) {
+const safeGetStorage = (key: string): string | null => {
   try {
-    localStorage.removeItem(key);
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(key);
   } catch (error) {
-    console.warn(`Failed to remove localStorage key: ${key}`, error);
+    console.error(`Failed to read localStorage key "${key}"`, error);
+    return null;
   }
-}
+};
 
-function safeSetLocalStorage(key: string, value: unknown) {
+const safeSetStorage = (key: string, value: unknown) => {
   try {
-    const serialized = JSON.stringify(value);
-    const size = getStringSize(serialized);
-
-    if (size > MAX_LOCALSTORAGE_ITEM_SIZE) {
-      console.warn(`Skipped saving "${key}" because payload is too large: ${size} bytes`);
-      return false;
-    }
-
-    localStorage.setItem(key, serialized);
-    return true;
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    console.warn(`Failed to save localStorage key: ${key}`, error);
+    console.error(`Failed to write localStorage key "${key}"`, error);
+  }
+};
+
+const getSystemDarkMode = () => {
+  try {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch {
     return false;
   }
-}
-
-function buildLightweightScript(script: AdScript): Partial<AdScript> {
-  return {
-    id: script.id,
-    timestamp: script.timestamp,
-    language: script.language,
-    tone: script.tone,
-    seamlessScript: script.seamlessScript,
-    productInfo: script.productInfo,
-    characterProfile:
-      typeof script.characterProfile === 'string'
-        ? script.characterProfile.slice(0, 3000)
-        : script.characterProfile,
-    segments: script.segments.map((segment) => ({
-      ...segment,
-      imagePrompt: segment.imagePrompt ? segment.imagePrompt.slice(0, 1200) : '',
-      videoPrompt: segment.videoPrompt ? segment.videoPrompt.slice(0, 1200) : '',
-    })),
-  };
-}
-
-function sanitizeHistory(history: AdScript[]) {
-  return history.slice(0, MAX_HISTORY_ITEMS).map((item) => buildLightweightScript(item));
-}
-
-function sanitizeTemplates(templates: SavedTemplate[]) {
-  return templates.map((template) => ({
-    ...template,
-    data: {
-      ...template.data,
-    },
-  }));
-}
+};
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'affiliate' | 'images' | 'templates' | 'video'>('form');
+  const [activeTab, setActiveTab] = useState<AppTab>('form');
   const [language, setLanguage] = useState<Language>('vi');
-  const { t } = useTranslation(language);
   const [tone, setTone] = useState<Tone>('Informative');
   const [brandVoice, setBrandVoice] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState<boolean>(() => getSystemDarkMode());
   const [isLoading, setIsLoading] = useState(false);
+
   const [currentScript, setCurrentScript] = useState<AdScript | null>(null);
   const [history, setHistory] = useState<AdScript[]>([]);
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
   const [editingTemplate, setEditingTemplate] = useState<ProductInfo | null>(null);
+
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
+  const { t } = useTranslation(language);
+
+  const hasCurrentScript = useMemo(() => Boolean(currentScript), [currentScript]);
+
   useEffect(() => {
-    const savedHistory = safeParseJSON<AdScript[]>(localStorage.getItem(STORAGE_KEYS.HISTORY), []);
-    setHistory(savedHistory);
-
-    const savedTmpls = safeParseJSON<SavedTemplate[]>(localStorage.getItem(STORAGE_KEYS.TEMPLATES), []);
-    setSavedTemplates(savedTmpls);
-
+    const savedHistory = safeParseJSON<AdScript[]>(
+      safeGetStorage(STORAGE_KEYS.history),
+      []
+    );
+    const savedTemplatesData = safeParseJSON<SavedTemplate[]>(
+      safeGetStorage(STORAGE_KEYS.templates),
+      []
+    );
     const savedCurrentScript = safeParseJSON<AdScript | null>(
-      localStorage.getItem(STORAGE_KEYS.CURRENT),
+      safeGetStorage(STORAGE_KEYS.currentScript),
       null
     );
+
+    setHistory(Array.isArray(savedHistory) ? savedHistory.slice(0, MAX_HISTORY_ITEMS) : []);
+    setSavedTemplates(Array.isArray(savedTemplatesData) ? savedTemplatesData : []);
     setCurrentScript(savedCurrentScript);
 
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setDarkMode(true);
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = (event: MediaQueryListEvent) => {
+      setDarkMode(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleThemeChange);
+    }
+
+    if (typeof mediaQuery.addListener === 'function') {
+      mediaQuery.addListener(handleThemeChange);
+      return () => mediaQuery.removeListener(handleThemeChange);
     }
   }, []);
 
   useEffect(() => {
-    if (!currentScript) {
-      safeRemoveLocalStorage(STORAGE_KEYS.CURRENT);
-      return;
-    }
-
-    const savedFull = safeSetLocalStorage(STORAGE_KEYS.CURRENT, currentScript);
-
-    if (!savedFull) {
-      const lightweight = buildLightweightScript(currentScript);
-      const savedLite = safeSetLocalStorage(STORAGE_KEYS.CURRENT, lightweight);
-
-      if (!savedLite) {
-        console.warn('Could not save current script even after reducing payload');
-      }
+    if (currentScript) {
+      safeSetStorage(STORAGE_KEYS.currentScript, currentScript);
     }
   }, [currentScript]);
 
   useEffect(() => {
-    const cleanedHistory = sanitizeHistory(history);
-    const saved = safeSetLocalStorage(STORAGE_KEYS.HISTORY, cleanedHistory);
-
-    if (!saved) {
-      const fallbackHistory = cleanedHistory.slice(0, 2);
-      safeSetLocalStorage(STORAGE_KEYS.HISTORY, fallbackHistory);
-    }
+    safeSetStorage(STORAGE_KEYS.history, history.slice(0, MAX_HISTORY_ITEMS));
   }, [history]);
 
   useEffect(() => {
-    const cleanedTemplates = sanitizeTemplates(savedTemplates);
-    const saved = safeSetLocalStorage(STORAGE_KEYS.TEMPLATES, cleanedTemplates);
-
-    if (!saved) {
-      const fallbackTemplates = cleanedTemplates.slice(0, 10);
-      safeSetLocalStorage(STORAGE_KEYS.TEMPLATES, fallbackTemplates);
-    }
+    safeSetStorage(STORAGE_KEYS.templates, savedTemplates);
   }, [savedTemplates]);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -178,19 +161,33 @@ export default function App() {
     setActiveTab('form');
 
     try {
-      const { segments, seamlessScript } = await generateAdScript(product, language, tone, brandVoice);
-      const characterProfile = await generateCharacterProfile(product);
-      const imagePrompts = await generateImagePrompts(segments, characterProfile, product.name);
-      const videoPrompts = await generateVideoPrompts(segments, characterProfile, product.name);
+      const { segments, seamlessScript } = await generateAdScript(
+        product,
+        language,
+        tone,
+        brandVoice
+      );
 
-      const segmentsWithPrompts = segments.map((s, i) => ({
-        ...s,
-        imagePrompt: imagePrompts[i] || '',
-        videoPrompt: videoPrompts[i] || '',
+      const characterProfile = await generateCharacterProfile(product);
+      const imagePrompts = await generateImagePrompts(
+        segments,
+        characterProfile,
+        product.name
+      );
+      const videoPrompts = await generateVideoPrompts(
+        segments,
+        characterProfile,
+        product.name
+      );
+
+      const segmentsWithPrompts: AdSegment[] = segments.map((segment, index) => ({
+        ...segment,
+        imagePrompt: imagePrompts[index] || '',
+        videoPrompt: videoPrompts[index] || '',
       }));
 
       const newScript: AdScript = {
-        id: Math.random().toString(36).slice(2, 11),
+        id: createId(),
         timestamp: Date.now(),
         language,
         tone,
@@ -202,11 +199,12 @@ export default function App() {
 
       setCurrentScript(newScript);
       setHistory((prev) => [newScript, ...prev].slice(0, MAX_HISTORY_ITEMS));
+      setEditingTemplate(null);
       setActiveTab('images');
     } catch (error: any) {
-      console.error('Generate script error:', error);
       const errorMessage =
-        error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
+        error?.message ||
+        'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
       alert(errorMessage);
     } finally {
       setIsLoading(false);
@@ -216,81 +214,95 @@ export default function App() {
   const handleUpdateSegment = (segmentId: string, updates: Partial<AdSegment>) => {
     setCurrentScript((prev) => {
       if (!prev) return null;
+
       return {
         ...prev,
-        segments: prev.segments.map((s) => (s.id === segmentId ? { ...s, ...updates } : s)),
+        segments: prev.segments.map((segment) =>
+          segment.id === segmentId ? { ...segment, ...updates } : segment
+        ),
       };
     });
   };
 
   const handleSendToImages = (idea: AffiliateIdea) => {
+    const totalScenes = Array.isArray(idea.scenes) ? idea.scenes.length : 0;
+    const segmentLength = totalScenes > 0 ? Math.max(4, Math.round(30 / totalScenes)) : 5;
+
     const newScript: AdScript = {
-      id: idea.id,
+      id: idea.id || createId(),
       timestamp: Date.now(),
       language,
       tone: 'Informative',
       productInfo: {
-        name: idea.conceptTitle,
-        category: idea.topic,
-        targetUser: idea.contentAngle,
+        name: idea.conceptTitle || 'Affiliate Idea',
+        category: idea.topic || '',
+        targetUser: idea.contentAngle || '',
         benefits: [],
         customBenefit: '',
         features: [],
         price: 0,
         currency: 'VND',
+        showPrice: false,
+        promotion: '',
         audienceDesc: '',
         painPoint: '',
         emotion: '',
         positioning: 'mid',
-        platform: idea.platform as any,
+        platform: (idea.platform as ProductInfo['platform']) || 'tiktok',
         ratio: '9:16',
-        totalLength: 30,
+        totalLength: Math.max(30, totalScenes * segmentLength),
         hookStyle: 'question',
         ctaType: 'click link',
+        forbiddenClaims: '',
+        brandName: '',
+        brandSlogan: '',
+        keywordsInclude: '',
+        keywordsAvoid: '',
+        musicVibe: '',
         characterType: 'real',
         voiceoverStyle: 'neutral',
         voiceoverSpeed: 'normal',
         hasVoiceover: true,
         onScreenText: true,
+        productImages: [],
+        usageImages: [],
       },
-      segments: idea.scenes.map((s) => ({
-        id: `${idea.id}-${s.scene}`,
-        index: s.scene,
-        startTime: (s.scene - 1) * 5,
-        endTime: s.scene * 5,
-        visualDirection: s.visualDescription,
+      segments: (idea.scenes || []).map((scene) => ({
+        id: `${idea.id || 'idea'}-${scene.scene}`,
+        index: scene.scene,
+        startTime: (scene.scene - 1) * segmentLength,
+        endTime: scene.scene * segmentLength,
+        visualDirection: scene.visualDescription || '',
         onScreenText: '',
-        voiceover: s.script,
+        voiceover: scene.script || '',
         sfx: '',
-        imagePrompt: s.imagePrompt,
-        videoPrompt: s.videoPrompt,
+        cameraNotes: '',
+        imagePrompt: scene.imagePrompt || '',
+        videoPrompt: scene.videoPrompt || '',
       })),
+      seamlessScript: (idea.scenes || []).map((scene) => scene.script || '').join(' ').trim(),
+      characterProfile: '',
     };
 
     setCurrentScript(newScript);
     setActiveTab('images');
   };
 
-  const handleSendToVideo = (idea: AffiliateIdea) => {
-    handleSendToImages(idea);
-    setActiveTab('video');
-  };
-
   const handleRegenerate = () => {
-    if (currentScript) {
+    if (currentScript?.productInfo) {
       handleGenerate(currentScript.productInfo);
     }
   };
 
   const handleSaveTemplate = (data: ProductInfo) => {
-    if (!data.name) {
+    if (!data.name?.trim()) {
       alert('Vui lòng nhập tên sản phẩm trước khi lưu mẫu.');
       return;
     }
 
     const newTemplate: SavedTemplate = {
-      id: Math.random().toString(36).slice(2, 11),
-      name: data.name,
+      id: createId(),
+      name: data.name.trim(),
       timestamp: Date.now(),
       data: { ...data },
     };
@@ -300,19 +312,20 @@ export default function App() {
   };
 
   const handleLoadTemplate = (template: SavedTemplate) => {
-    setEditingTemplate(template.data);
+    setEditingTemplate({ ...template.data });
     setActiveTab('form');
   };
 
   const handleDeleteTemplate = (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa mẫu này?')) {
-      setSavedTemplates((prev) => prev.filter((t) => t.id !== id));
+    if (window.confirm('Bạn có chắc chắn muốn xóa mẫu này?')) {
+      setSavedTemplates((prev) => prev.filter((template) => template.id !== id));
     }
   };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
       <UsageDashboard language={language} />
+
       <SettingsBar
         language={language}
         setLanguage={setLanguage}
@@ -321,7 +334,7 @@ export default function App() {
         brandVoice={brandVoice}
         setBrandVoice={setBrandVoice}
         darkMode={darkMode}
-        toggleDarkMode={() => setDarkMode(!darkMode)}
+        toggleDarkMode={() => setDarkMode((prev) => !prev)}
         onOpenApiKeySettings={() => setShowApiKeyModal(true)}
       />
 
@@ -373,9 +386,9 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('images')}
-              disabled={!currentScript}
+              disabled={!hasCurrentScript}
               className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript
+                !hasCurrentScript
                   ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed'
                   : activeTab === 'images'
                     ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
@@ -384,21 +397,6 @@ export default function App() {
             >
               <ImageIcon className="w-4 h-4" />
               {t('productImages')}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('video')}
-              disabled={!currentScript}
-              className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed'
-                  : activeTab === 'video'
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <Video className="w-4 h-4" />
-              {t('buildVideo')}
             </button>
 
             <button
@@ -440,7 +438,9 @@ export default function App() {
                   </div>
 
                   <div className="text-center space-y-2">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t('generatingScript')}</h3>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                      {t('generatingScript')}
+                    </h3>
                     <p className="text-sm text-zinc-500 max-w-xs">{t('aiAnalyzing')}</p>
                   </div>
                 </motion.div>
@@ -467,7 +467,7 @@ export default function App() {
                       <AffiliateChannelTab
                         language={language}
                         onSendToImages={handleSendToImages}
-                        onSendToVideo={handleSendToVideo}
+                        onSendToVideo={handleSendToImages}
                       />
                     </div>
                   ) : activeTab === 'images' ? (
@@ -476,13 +476,11 @@ export default function App() {
                         <ProductImageTab
                           script={currentScript}
                           onUpdateSegment={handleUpdateSegment}
+                          onGenerateAnother={handleRegenerate}
                           language={language}
+                          isGenerating={isLoading}
                         />
                       </div>
-                    </ApiKeyGuard>
-                  ) : activeTab === 'video' ? (
-                    <ApiKeyGuard language={language}>
-                      <VideoGenerationTab currentScript={currentScript} language={language} />
                     </ApiKeyGuard>
                   ) : (
                     <div className="max-w-4xl mx-auto">
