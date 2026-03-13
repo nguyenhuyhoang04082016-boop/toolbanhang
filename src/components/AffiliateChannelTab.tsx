@@ -26,7 +26,6 @@ import { generateAffiliateIdeas } from '../services/geminiService';
 interface AffiliateChannelTabProps {
   language: Language;
   onSendToImages: (idea: AffiliateIdea) => void;
-  onSendToVideo: (idea: AffiliateIdea) => void;
 }
 
 const INITIAL_STATE: AffiliateChannelInfo = {
@@ -56,8 +55,7 @@ const INITIAL_STATE: AffiliateChannelInfo = {
 
 export const AffiliateChannelTab: React.FC<AffiliateChannelTabProps> = ({ 
   language, 
-  onSendToImages, 
-  onSendToVideo 
+  onSendToImages 
 }) => {
   const { t } = useTranslation(language);
   const [formData, setFormData] = useState<AffiliateChannelInfo>(() => {
@@ -513,17 +511,10 @@ Visual: ${s.visualDescription}`).join('\n\n')}
                   <div className="pt-4 flex items-center gap-2">
                     <button
                       onClick={() => onSendToImages(idea)}
-                      className="flex-1 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-[10px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all flex items-center justify-center gap-2"
                     >
                       <ImageIcon className="w-3 h-3" />
                       {t('sendToImages')}
-                    </button>
-                    <button
-                      onClick={() => onSendToVideo(idea)}
-                      className="flex-1 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Video className="w-3 h-3" />
-                      {t('sendToVideo')}
                     </button>
                   </div>
                 </div>
