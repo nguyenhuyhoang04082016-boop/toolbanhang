@@ -21,6 +21,7 @@ const initialData: ProductInfo = {
   features: [],
   price: 0,
   currency: 'USD',
+  showPrice: true,
   audienceDesc: '',
   painPoint: '',
   emotion: 'Excited',
@@ -317,7 +318,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('price')} *</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('price')} *</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.showPrice}
+                  onChange={(e) => setFormData({ ...formData, showPrice: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-xs text-zinc-500">{t('showPrice')}</span>
+              </label>
+            </div>
             <div className="flex gap-2">
               <input
                 type="number"
@@ -674,50 +686,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
           )}
         </button>
       </div>
-
-      {/* Script Tables Section */}
-      {currentScript && (
-        <div className="mt-12 space-y-12 pb-24">
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Video className="w-5 h-5 text-indigo-500" />
-              {t('videoConstructionScript')}
-            </h3>
-            <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 uppercase text-[10px] font-bold tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3 w-16">#</th>
-                    <th className="px-4 py-3">{t('visualDirection')}</th>
-                    <th className="px-4 py-3">{t('voiceover')}</th>
-                    <th className="px-4 py-3">SFX</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {currentScript.segments.map((segment) => (
-                    <tr key={segment.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                      <td className="px-4 py-4 font-mono text-zinc-400">{segment.index}</td>
-                      <td className="px-4 py-4 text-zinc-700 dark:text-zinc-300">{segment.visualDirection}</td>
-                      <td className="px-4 py-4 text-zinc-600 dark:text-zinc-400 italic">"{segment.voiceover}"</td>
-                      <td className="px-4 py-4 text-zinc-500">{segment.sfx}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-indigo-500" />
-              {t('seamlessVoiceoverScript')}
-            </h3>
-            <div className="p-6 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {currentScript.seamlessScript}
-            </div>
-          </div>
-        </div>
-      )}
     </form>
   );
 };
