@@ -1,53 +1,55 @@
 export type Language = 'en' | 'vi';
-export type Tone = 'Funny' | 'Premium' | 'Urgent' | 'Warm' | 'Informative';
 export type Platform = 'TikTok' | 'Reels' | 'FB' | 'YouTube Shorts';
 export type VideoRatio = '9:16' | '1:1' | '16:9';
+export type VideoType = 'review' | 'cinematic' | 'vlog' | 'unboxing' | 'tutorial';
 export type HookStyle = 'question' | 'shock' | 'story' | 'problem-solution' | 'testimonial';
 export type CTAType = 'buy now' | 'message inbox' | 'click link' | 'comment keyword';
 export type VoiceoverStyle = 'male' | 'female' | 'neutral';
 export type VoiceoverSpeed = 'fast' | 'normal' | 'slow';
 
+export interface ImageCategory {
+  id: string;
+  name: string;
+  images: string[];
+}
+
+export interface VisualTemplate {
+  id: string;
+  name: string;
+  timestamp: number;
+  categories: ImageCategory[];
+}
+
 export interface ProductInfo {
   name: string;
-  category: string;
-  targetUser: string;
-  benefits: string[];
-  customBenefit: string;
-  features: string[];
-  materials?: string;
-  sizes?: string;
-  price: number;
-  currency: string;
-  showPrice: boolean;
-  promotion?: string;
-  stock?: string;
-  shipping?: string;
-  warranty?: string;
-  
-  audienceDesc: string;
-  painPoint: string;
-  emotion: string;
-  positioning: 'budget' | 'mid' | 'premium';
-  
-  platform: Platform;
+  category?: string;
   ratio: VideoRatio;
-  totalLength: number;
-  hookStyle: HookStyle;
-  ctaType: CTAType;
-  characterType: 'real' | 'cartoon';
-  forbiddenClaims?: string;
+  videoType?: VideoType;
+  additionalRequirements?: string;
+  referenceImages?: string[];
+  imageCategories?: ImageCategory[];
+  selectedTemplateId?: string;
   
-  brandName?: string;
-  brandSlogan?: string;
-  keywordsInclude?: string;
-  keywordsAvoid?: string;
-  voiceoverStyle: VoiceoverStyle;
-  voiceoverSpeed: VoiceoverSpeed;
-  hasVoiceover: boolean;
-  onScreenText: boolean;
-  musicVibe?: string;
-  productImages?: string[];
-  usageImages?: string[];
+  // Legacy fields for compatibility if needed, but we'll focus on the above
+  targetUser?: string;
+  benefits?: string[];
+  features?: string[];
+  price?: number;
+  currency?: string;
+  showPrice?: boolean;
+  audienceDesc?: string;
+  painPoint?: string;
+  emotion?: string;
+  positioning?: 'budget' | 'mid' | 'premium';
+  platform?: Platform;
+  totalLength?: number;
+  hookStyle?: HookStyle;
+  ctaType?: CTAType;
+  characterType?: 'real' | 'cartoon';
+  voiceoverStyle?: VoiceoverStyle;
+  voiceoverSpeed?: VoiceoverSpeed;
+  hasVoiceover?: boolean;
+  onScreenText?: boolean;
 }
 
 export interface AdSegment {
@@ -117,9 +119,14 @@ export interface AdScript {
   id: string;
   timestamp: number;
   language: Language;
-  tone: Tone;
   segments: AdSegment[];
   seamlessScript?: string;
+  productAnalysis?: {
+    features: string[];
+    specs: string[];
+    usage: string[];
+    benefits: string[];
+  };
   productInfo: ProductInfo;
   characterProfile?: string;
 }
@@ -129,51 +136,6 @@ export interface SavedTemplate {
   name: string;
   timestamp: number;
   data: ProductInfo;
-}
-
-export interface AffiliateChannelInfo {
-  platform: string;
-  channelType: string;
-  channelGoal: string;
-  channelName: string;
-  channelDescription: string;
-  
-  mainTopic: string;
-  subTopics: string[];
-  targetAudience: string[];
-  customerInsight: string;
-  customerPainPoints: string;
-  productBenefits: string;
-  contentStyle: string[];
-  contentTone: string;
-  targetVideoLength: string;
-  postingFrequency: string;
-  
-  hookType: string[];
-  scriptStructure: string;
-  ideaCount: number;
-  segmentCount: number;
-  diversityLevel: 'Low' | 'Medium' | 'High';
-  ctaText: string;
-  specialRequirements: string;
-}
-
-export interface AffiliateIdea {
-  id: string;
-  conceptTitle: string;
-  platform: string;
-  topic: string;
-  contentAngle: string;
-  hookType: string;
-  hookText: string;
-  cta: string;
-  scenes: {
-    scene: number;
-    script: string;
-    visualDescription: string;
-    imagePrompt: string;
-    videoPrompt: string;
-  }[];
 }
 
 declare global {

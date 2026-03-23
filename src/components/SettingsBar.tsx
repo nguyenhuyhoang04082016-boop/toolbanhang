@@ -1,13 +1,11 @@
 import React from 'react';
 import { Moon, Sun, Languages, Zap, ShieldCheck, Key } from 'lucide-react';
-import { Language, Tone } from '../types';
+import { Language } from '../types';
 import { useTranslation } from '../i18n';
 
 interface SettingsBarProps {
   language: Language;
   setLanguage: (l: Language) => void;
-  tone: Tone;
-  setTone: (t: Tone) => void;
   brandVoice: boolean;
   setBrandVoice: (b: boolean) => void;
   darkMode: boolean;
@@ -15,13 +13,9 @@ interface SettingsBarProps {
   onOpenApiKeySettings: () => void;
 }
 
-const tones: Tone[] = ['Funny', 'Premium', 'Urgent', 'Warm', 'Informative'];
-
 export const SettingsBar: React.FC<SettingsBarProps> = ({
   language,
   setLanguage,
-  tone,
-  setTone,
   brandVoice,
   setBrandVoice,
   darkMode,
@@ -29,13 +23,6 @@ export const SettingsBar: React.FC<SettingsBarProps> = ({
   onOpenApiKeySettings,
 }) => {
   const { t } = useTranslation(language);
-
-  const getToneLabel = (t: Tone) => {
-    if (language === 'vi') {
-      return t === 'Funny' ? 'Hài hước' : t === 'Premium' ? 'Sang trọng' : t === 'Urgent' ? 'Khẩn cấp' : t === 'Warm' ? 'Ấm áp' : 'Thông tin';
-    }
-    return t;
-  };
 
   return (
     <div className="h-16 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 bg-white dark:bg-zinc-950 sticky top-0 z-50">
@@ -82,19 +69,6 @@ export const SettingsBar: React.FC<SettingsBarProps> = ({
             VI
           </button>
         </div>
-
-        {/* Tone Dropdown */}
-        <select
-          value={tone}
-          onChange={(e) => setTone(e.target.value as Tone)}
-          className="bg-zinc-100 dark:bg-zinc-900 border-none rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
-        >
-          {tones.map((toneVal) => (
-            <option key={toneVal} value={toneVal}>
-              {t('tone')}: {getToneLabel(toneVal)}
-            </option>
-          ))}
-        </select>
 
         {/* Brand Voice Toggle */}
         <button
