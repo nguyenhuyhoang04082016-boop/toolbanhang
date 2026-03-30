@@ -4,18 +4,20 @@ import { ProductForm } from './components/ProductForm';
 import { CharacterEnvTab } from './components/CharacterEnvTab';
 import { ProductAssetsTab } from './components/ProductAssetsTab';
 import { ProductImageTab } from './components/ProductImageTab';
+import { ScriptOrientationTab } from './components/ScriptOrientationTab';
+import { VideoGenerationTab } from './components/VideoGenerationTab';
 import { SavedTemplatesTab } from './components/SavedTemplatesTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
 import { AdScript, AdSegment, Language, ProductInfo, SavedTemplate, VisualTemplate } from './types';
 import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateVideoPrompts } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
-import { Info, Image as ImageIcon, Bookmark, Globe, Sparkles, ShoppingCart, Trash2, Plus } from 'lucide-react';
+import { Info, Image as ImageIcon, Bookmark, Globe, Sparkles, ShoppingCart, Trash2, Plus, List, PlayCircle } from 'lucide-react';
 
 import { UsageDashboard } from './components/UsageDashboard';
 import { useTranslation } from './i18n';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'characterEnv' | 'productImages' | 'results' | 'templates'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'characterEnv' | 'productImages' | 'orientation' | 'results' | 'videoGen' | 'templates'>('form');
   const [language, setLanguage] = useState<Language>('vi');
   const { t } = useTranslation(language);
   const [brandVoice, setBrandVoice] = useState(false);
@@ -38,7 +40,12 @@ export default function App() {
     additionalRequirements: '',
     referenceImages: [],
     imageCategories: [],
-    hasVoiceover: true
+    hasVoiceover: true,
+    scriptOrientation: {
+      style: 'lifestyle',
+      dialogueType: 'self-talk',
+      additionalNotes: ''
+    }
   });
 
   // Load history and saved templates from local storage
@@ -360,7 +367,7 @@ export default function App() {
   };
 
   const handleLoadTemplate = (template: SavedTemplate) => {
-    setEditingTemplate(template.data);
+    setProductDraft({ ...template.data });
     setActiveTab('form');
   };
 
@@ -441,6 +448,17 @@ export default function App() {
               {t('productImages')}
             </button>
             <button
+              onClick={() => setActiveTab('orientation')}
+              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                activeTab === 'orientation'
+                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              {t('scriptOrientation') || 'Định hướng'}
+            </button>
+            <button
               onClick={() => setActiveTab('results')}
               disabled={!currentScript}
               className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
@@ -451,8 +469,22 @@ export default function App() {
                     : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
               }`}
             >
-              <Globe className="w-4 h-4" />
-              {t('buildVideo')}
+              <List className="w-4 h-4" />
+              {t('scriptAndImages') || 'Kịch bản & Ảnh'}
+            </button>
+            <button
+              onClick={() => setActiveTab('videoGen')}
+              disabled={!currentScript}
+              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                !currentScript 
+                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
+                  : activeTab === 'videoGen'
+                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+              }`}
+            >
+              <PlayCircle className="w-4 h-4" />
+              {t('createVideo') || 'Tạo Video'}
             </button>
             <button
               onClick={() => setActiveTab('templates')}
@@ -520,7 +552,7 @@ export default function App() {
                           alert(t('templateSaved'));
                         }}
                         isLoading={isLoading} 
-                        initialValue={editingTemplate || productDraft}
+                        initialValue={productDraft}
                         onChange={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
                         language={language}
                         currentScript={currentScript}
@@ -544,6 +576,16 @@ export default function App() {
                         onUpdate={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
                         onDeleteTemplate={handleDeleteVisualTemplate}
                         onUseTemplate={handleUseVisualTemplate}
+                        onNext={() => setActiveTab('orientation')}
+                        isLoading={isLoading}
+                        language={language}
+                      />
+                    </div>
+                  ) : activeTab === 'orientation' ? (
+                    <div className="max-w-4xl mx-auto">
+                      <ScriptOrientationTab
+                        product={productDraft}
+                        onUpdate={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
                         onGenerate={() => handleGenerate(productDraft)}
                         isLoading={isLoading}
                         language={language}
@@ -557,8 +599,21 @@ export default function App() {
                           onUpdateSegment={handleUpdateSegment} 
                           onUpdateProductInfo={handleUpdateProductInfo}
                           onGenerateAnother={handleRegenerate}
+                          onNext={() => setActiveTab('videoGen')}
+                          onOpenApiKeySettings={() => setShowApiKeyModal(true)}
                           language={language}
                           isGenerating={isLoading}
+                        />
+                      </div>
+                    </ApiKeyGuard>
+                  ) : activeTab === 'videoGen' ? (
+                    <ApiKeyGuard language={language}>
+                      <div className="max-w-6xl mx-auto">
+                        <VideoGenerationTab
+                          script={currentScript}
+                          onUpdateSegments={handleUpdateSegments}
+                          onOpenApiKeySettings={() => setShowApiKeyModal(true)}
+                          language={language}
                         />
                       </div>
                     </ApiKeyGuard>

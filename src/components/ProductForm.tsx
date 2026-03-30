@@ -28,21 +28,28 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
   const { t } = useTranslation(language);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const lastInitialValueRef = React.useRef<string>('');
+
   useEffect(() => {
     if (initialValue) {
-      // Deep comparison or simple check to avoid unnecessary updates
-      if (JSON.stringify(initialValue) !== JSON.stringify(formData)) {
+      const initialValueStr = JSON.stringify(initialValue);
+      if (initialValueStr !== lastInitialValueRef.current) {
         setFormData(initialValue);
+        lastInitialValueRef.current = initialValueStr;
       }
     }
   }, [initialValue]);
 
   const updateFormData = (updates: Partial<ProductInfo>) => {
-    const newData = { ...formData, ...updates };
-    setFormData(newData);
-    if (onChange) {
-      onChange(updates);
-    }
+    setFormData(prev => {
+      const newData = { ...prev, ...updates };
+      // Update ref immediately to prevent loop if parent re-renders
+      lastInitialValueRef.current = JSON.stringify(newData);
+      if (onChange) {
+        onChange(updates);
+      }
+      return newData;
+    });
   };
 
   const validate = () => {
@@ -67,25 +74,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
     const files = e.target.files;
     if (!files) return;
 
+    const currentImages = [...(formData.referenceImages || [])];
+    const newImages: string[] = [];
+    let processed = 0;
+
     Array.from(files).forEach((file: File) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setFormData(prev => ({
-          ...prev,
-          referenceImages: [...(prev.referenceImages || []), base64String]
-        }));
+        newImages.push(reader.result as string);
+        processed++;
+        if (processed === files.length) {
+          updateFormData({ referenceImages: [...currentImages, ...newImages] });
+        }
       };
       reader.readAsDataURL(file);
     });
   };
 
   const removeImage = (index: number) => {
-    setFormData(prev => {
-      const newImages = [...(prev.referenceImages || [])];
-      newImages.splice(index, 1);
-      return { ...prev, referenceImages: newImages };
-    });
+    const newImages = [...(formData.referenceImages || [])];
+    newImages.splice(index, 1);
+    updateFormData({ referenceImages: newImages });
   };
 
   const renderImageGrid = (images: string[], onRemove: (idx: number) => void, onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void, error?: string) => (

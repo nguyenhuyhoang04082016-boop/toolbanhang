@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ProductInfo, AdSegment, Language, AdScript } from "../types";
 import { trackUsage, calculateCost } from "./costService";
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-3-flash-preview";
 
 const getApiKey = (type: 'gemini' | 'veo' = 'gemini') => {
   const manualGeminiKey = typeof window !== 'undefined' ? localStorage.getItem('manual_gemini_api_key') : null;
@@ -11,9 +11,10 @@ const getApiKey = (type: 'gemini' | 'veo' = 'gemini') => {
   // Priority: 
   // 1. Manual key for specific type (entered in text fields)
   // 2. Platform selected key (selected via "Chọn API Key từ Project")
-  // We EXPLICITLY remove process.env.GEMINI_API_KEY to avoid "passive" usage.
   
   if (type === 'veo') {
+    // Veo 3 requires a paid key. We prioritize the manual key if provided, 
+    // otherwise we use the platform-injected key which is updated when the user selects a key in the dialog.
     return manualVeoKey || process.env.API_KEY || "";
   }
   return manualGeminiKey || process.env.API_KEY || "";
@@ -185,6 +186,41 @@ export async function generateAdScript(
   language: Language,
   brandVoice: boolean
 ): Promise<{ segments: AdSegment[], seamlessScript: string, productAnalysis: any }> {
+  // Check for Mock Mode
+  const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
+  if (isMockMode) {
+    return {
+      segments: [
+        { 
+          id: '1', 
+          index: 1, 
+          startTime: 0, 
+          endTime: 5, 
+          visualDirection: "Cảnh mở đầu giới thiệu sản phẩm", 
+          voiceover: "Chào mừng bạn đến với sản phẩm mới", 
+          onScreenText: "Sản phẩm mới", 
+          sfx: "Âm nhạc sôi động",
+          imagePrompt: "A beautiful product shot", 
+          videoPrompt: "A cinematic product reveal" 
+        },
+        { 
+          id: '2', 
+          index: 2, 
+          startTime: 5, 
+          endTime: 15, 
+          visualDirection: "Cảnh chi tiết tính năng", 
+          voiceover: "Đây là tính năng nổi bật nhất", 
+          onScreenText: "Tính năng nổi bật", 
+          sfx: "Tiếng click nhẹ",
+          imagePrompt: "Close up of the product", 
+          videoPrompt: "Detailed view of the product" 
+        }
+      ],
+      seamlessScript: "Chào mừng bạn đến với sản phẩm mới. Đây là tính năng nổi bật nhất.",
+      productAnalysis: "Sản phẩm tuyệt vời với nhiều tính năng."
+    };
+  }
+
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
   const systemInstruction = `You are an expert AI Product Analyst and Ad Script Writer, specialized in creating high-converting short-form video content (TikTok, Reels, Shorts).
@@ -214,20 +250,25 @@ export async function generateAdScript(
   
   STEP 3: GENERATE AD SCRIPT
   Based on the analysis and user requirements, generate a high-converting, seamless ad script for Veo 3.
-  - Video Type: ${product.videoType || 'cinematic'}.
-  - Voiceover Enabled: ${product.hasVoiceover ? 'YES' : 'NO'}.
-  ${product.hasVoiceover ? `
-  - IMPORTANT: The script MUST include spoken dialogue (voiceover) for the character.
+  - Ad Style: ${product.scriptOrientation?.style || product.videoType || 'lifestyle'}.
+  - Dialogue Type: ${product.scriptOrientation?.dialogueType || 'self-talk'}.
+  
+  DIALOGUE RULES:
+  ${product.scriptOrientation?.dialogueType === 'self-talk' ? `
+  - The character MUST speak directly to the camera (self-talk).
   - The dialogue MUST be in Vietnamese (Tiếng Việt).
   - The dialogue MUST be natural, engaging, and optimized for LIP-SYNC (khớp khẩu hình miệng).
-  - Describe the character speaking directly to the camera in the visualDirection when appropriate.
+  - Explicitly describe the character speaking in the visualDirection.
+  ` : product.scriptOrientation?.dialogueType === 'no-read' ? `
+  - The character is present in the scene but DOES NOT speak (no lip-sync needed).
+  - There can be a voiceover (narrator) in Vietnamese, but it's not from the character's mouth.
   ` : `
-  - IMPORTANT: The script MUST NOT include spoken dialogue.
+  - NO DIALOGUE or voiceover at all.
   - Focus entirely on visual storytelling, background music, and sound effects (sfx).
-  - The "seamlessScript" should be empty or contain only sound descriptions.
   `}
-  - IMPORTANT: If Video Type is "review" and a character image is provided, describe the specific person from that image reviewing the product.
-  - The script must be seamless and natural (no voiceover labels).
+  
+  - IMPORTANT: If a character image is provided, describe the specific person from that image.
+  - The script must be seamless and natural.
   - Split the script into segments of exactly 6 seconds each.
   - Structure: exactly ${Math.ceil((product.totalLength || 30) / 6)} segments to match the total duration of ${product.totalLength || 30}s.
   
@@ -236,10 +277,12 @@ export async function generateAdScript(
   - "seamlessScript": string (the full voiceover/narrative script)
   - "segments": array of objects with:
     - visualDirection: string (detailed cinematic description for Veo 3, following the provided images strictly)
+    - voiceover: string (The Vietnamese dialogue or narration for this segment)
     - sfx: string (audio cues)
     - cameraNotes: string (camera movement tips)
   
   Language: ${language === 'vi' ? 'Vietnamese' : 'English'}.
+  Additional Orientation Notes: ${product.scriptOrientation?.additionalNotes || 'None'}.
   Additional Requirements: ${product.additionalRequirements || 'None'}.
   `;
 
@@ -345,6 +388,12 @@ export async function generateAdScript(
 }
 
 export async function generateCharacterProfile(product: ProductInfo): Promise<string> {
+  // Check for Mock Mode
+  const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
+  if (isMockMode) {
+    return "Nhân vật nữ trẻ trung, năng động, mặc trang phục hiện đại.";
+  }
+
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   const prompt = `Based on this product and target audience, create a detailed visual description of a recurring character or mascot for the ad campaign to ensure visual consistency. 
   Product: ${product.name}
@@ -388,6 +437,12 @@ export async function generateImagePrompts(
   productName: string,
   referenceImages: string[] = []
 ): Promise<string[]> {
+  // Check for Mock Mode
+  const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
+  if (isMockMode) {
+    return segments.map(() => "A beautiful product shot");
+  }
+
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
   const prompt = `For each of the following ad segments, generate a high-quality, detailed image generation prompt. 
@@ -452,6 +507,20 @@ export async function generateImage(
   aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9",
   base64Images?: string[]
 ): Promise<string> {
+  // Check for Mock Mode
+  const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
+  if (isMockMode) {
+    // Return a high-quality placeholder image from Picsum
+    const seed = Math.random().toString(36).substring(7);
+    const [width, height] = aspectRatio === '16:9' ? [1920, 1080] : aspectRatio === '9:16' ? [1080, 1920] : [1024, 1024];
+    return `https://picsum.photos/seed/${seed}/${width}/${height}`;
+  }
+
+  const apiKey = getApiKey('gemini');
+  if (!apiKey) {
+    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng vào phần Cài đặt để nhập Key.");
+  }
+
   const parts: any[] = [{ text: prompt }];
   
   if (base64Images && base64Images.length > 0) {
@@ -470,13 +539,14 @@ export async function generateImage(
 
   try {
     const response = await callGeminiWithRetry({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts,
       },
       config: {
         imageConfig: {
           aspectRatio: aspectRatio,
+          imageSize: "1K"
         },
       },
     });
@@ -489,7 +559,7 @@ export async function generateImage(
 
     // Handle permission errors
     if (response.text?.includes("not allowed") || response.text?.includes("permission denied")) {
-      throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Bạn cần nâng cấp lên gói trả phí (Paid) trong Google Cloud để sử dụng tính năng này.");
+      throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Vui lòng sử dụng API Key từ một Project có bật thanh toán (Paid).");
     }
 
     for (const part of candidate?.content?.parts || []) {
@@ -500,7 +570,8 @@ export async function generateImage(
     
     throw new Error("Không thể tạo ảnh từ câu lệnh này. Có thể do giới hạn của tài khoản miễn phí.");
   } catch (error: any) {
-    if (error?.message?.includes("403") || error?.message?.includes("permission")) {
+    const msg = error?.message || "";
+    if (msg.includes("403") || msg.includes("permission") || msg.includes("quota") || msg.includes("limit")) {
       throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Vui lòng sử dụng API Key từ một Project có bật thanh toán (Paid).");
     }
     throw error;
@@ -513,6 +584,12 @@ export async function generateVideoPrompts(
   productName: string,
   referenceImages: string[] = []
 ): Promise<string[]> {
+  // Check for Mock Mode
+  const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
+  if (isMockMode) {
+    return segments.map(() => "A cinematic product reveal");
+  }
+
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
   const prompt = `You are an expert AI Video Director specializing in Veo 3 (Google's high-end video generation model).
@@ -589,6 +666,13 @@ export async function generateVideo(
   endImage?: string,
   aspectRatio: "16:9" | "9:16" = "9:16"
 ): Promise<string> {
+  // Check for Mock Mode
+  const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
+  if (isMockMode) {
+    // Return a sample video URL
+    return "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+  }
+
   const apiKey = getApiKey('veo');
   if (!apiKey) {
     throw new Error("Chưa cấu hình Veo API Key. Vui lòng vào phần Cài đặt để nhập Key.");

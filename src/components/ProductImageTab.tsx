@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AdScript, AdSegment, Language, ProductInfo } from '../types';
 import { Image as ImageIcon, Sparkles, Loader2, RefreshCw, Download, Send, Upload, X as XIcon, CheckCircle2, List, Settings, PlayCircle, Info } from 'lucide-react';
-import { generateImage, refineImagePrompt } from '../services/geminiService';
+import { motion, AnimatePresence } from 'motion/react';
+import { generateImage, refineImagePrompt, generateVideo } from '../services/geminiService';
 import { useTranslation } from '../i18n';
 
 interface ProductImageTabProps {
@@ -9,6 +10,8 @@ interface ProductImageTabProps {
   onUpdateSegment: (segmentId: string, updates: Partial<AdSegment>) => void;
   onUpdateProductInfo: (updates: Partial<ProductInfo>) => void;
   onGenerateAnother: () => void;
+  onNext: () => void;
+  onOpenApiKeySettings?: () => void;
   language: Language;
   isGenerating?: boolean;
 }
@@ -18,12 +21,16 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
   onUpdateSegment, 
   onUpdateProductInfo,
   onGenerateAnother,
+  onNext,
+  onOpenApiKeySettings,
   language,
   isGenerating = false
 }) => {
   const { t } = useTranslation(language);
   const [viPrompts, setViPrompts] = useState<Record<string, string>>({});
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({});
+
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
 
   if (!script) {
     return (
@@ -45,6 +52,13 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
       </div>
     );
   }
+
+  // Set initial selected segment if not set
+  if (!selectedSegmentId && script.segments.length > 0) {
+    setSelectedSegmentId(script.segments[0].id);
+  }
+
+  const selectedSegment = script.segments.find(s => s.id === selectedSegmentId);
 
   const handleRefinePrompt = async (segmentId: string) => {
     const instruction = viPrompts[segmentId];
@@ -98,9 +112,16 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         isGeneratingStart: false,
         isGeneratingEnd: false 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating images:", error);
-      alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
+      const msg = error?.message || "";
+      if (msg.includes("Tài khoản Gemini Miễn phí") || msg.includes("Paid") || msg.includes("permission")) {
+        if (confirm(msg + (language === 'vi' ? "\n\nBạn có muốn mở phần Cài đặt để chọn API Key khác không?" : "\n\nWould you like to open Settings to select a different API Key?"))) {
+          onOpenApiKeySettings?.();
+        }
+      } else {
+        alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
+      }
       onUpdateSegment(segment.id, { 
         isGeneratingStart: false, 
         isGeneratingEnd: false 
@@ -332,158 +353,213 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         </div>
       </div>
 
-      {/* Segments Table */}
-      <div className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1400px]">
-            <thead>
-              <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-12">#</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-40">{t('segment')}</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-80">{t('visualDirection')}</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-80">{t('geminiPrompt')}</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-40 text-center">{t('startImage')}</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-40 text-center">{t('endImage')}</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-80">{t('veo3Prompt')}</th>
-                <th className="py-4 px-6 text-[10px] font-bold text-zinc-400 uppercase tracking-wider w-40 text-center">{t('actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
-              {(script.segments || []).map((segment) => (
-                <tr key={segment.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors align-top">
-                  <td className="py-8 px-6 text-sm font-medium text-zinc-400">{segment.index}</td>
-                  <td className="py-8 px-6">
-                    <div className="space-y-1">
-                      <span className="text-sm font-bold text-zinc-900 dark:text-white block">{t('segment')} {segment.index}</span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
-                        {segment.startTime}s - {segment.endTime}s
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-8 px-6">
-                    <textarea
-                      value={segment.visualDirection}
-                      onChange={(e) => onUpdateSegment(segment.id, { visualDirection: e.target.value })}
-                      className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-32 resize-none transition-all"
-                    />
-                  </td>
-                  <td className="py-8 px-6 space-y-4">
-                    <div className="relative group">
-                      <textarea
-                        value={viPrompts[segment.id] || ''}
-                        onChange={(e) => setViPrompts(prev => ({ ...prev, [segment.id]: e.target.value }))}
-                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleRefinePrompt(segment.id))}
-                        className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 pr-12 text-xs font-medium text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none shadow-sm"
-                        placeholder={language === 'vi' ? "Chỉnh sửa bằng Tiếng Việt..." : "Refine with Vietnamese..."}
-                      />
-                      <button
-                        onClick={() => handleRefinePrompt(segment.id)}
-                        disabled={isTranslating[segment.id] || !viPrompts[segment.id]}
-                        className="absolute bottom-3 right-3 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-all shadow-md"
-                      >
-                        {isTranslating[segment.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <textarea
-                      value={segment.imagePrompt || ''}
-                      onChange={(e) => onUpdateSegment(segment.id, { imagePrompt: e.target.value })}
-                      className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-[10px] font-mono text-zinc-500 focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none"
-                      placeholder="English image prompt..."
-                    />
-                  </td>
-                  <td className="py-8 px-6">
-                    <div className="aspect-[9/16] w-24 mx-auto bg-zinc-100 dark:bg-zinc-900 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-sm">
-                      {segment.startImageUrl ? (
-                        <>
-                          <img src={segment.startImageUrl} alt="Start" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button 
-                              onClick={() => {
-                                const a = document.createElement('a');
-                                a.href = segment.startImageUrl!;
-                                a.download = `segment-${segment.index}-start.png`;
-                                a.click();
-                              }}
-                              className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </>
-                      ) : segment.isGeneratingStart ? (
-                        <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
-                      ) : (
-                        <ImageIcon className="w-6 h-6 text-zinc-300" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-8 px-6">
-                    <div className="aspect-[9/16] w-24 mx-auto bg-zinc-100 dark:bg-zinc-900 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-sm">
-                      {segment.endImageUrl ? (
-                        <>
-                          <img src={segment.endImageUrl} alt="End" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button 
-                              onClick={() => {
-                                const a = document.createElement('a');
-                                a.href = segment.endImageUrl!;
-                                a.download = `segment-${segment.index}-end.png`;
-                                a.click();
-                              }}
-                              className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </>
-                      ) : segment.isGeneratingEnd ? (
-                        <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
-                      ) : (
-                        <ImageIcon className="w-6 h-6 text-zinc-300" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-8 px-6">
-                    <textarea
-                      value={segment.videoPrompt || ''}
-                      onChange={(e) => onUpdateSegment(segment.id, { videoPrompt: e.target.value })}
-                      className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-44 resize-none shadow-sm"
-                      placeholder="Veo 3 detailed prompt..."
-                    />
-                  </td>
-                  <td className="py-8 px-6">
-                    <div className="flex flex-col items-center gap-3">
-                      <button
-                        onClick={() => handleGenerateImages(segment)}
-                        disabled={segment.isGeneratingStart || segment.isGeneratingEnd}
-                        className={`w-full py-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                          (segment.startImageUrl && segment.endImageUrl)
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-500/20'
-                        } disabled:opacity-50`}
-                      >
-                        {segment.isGeneratingStart || segment.isGeneratingEnd ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (segment.startImageUrl && segment.endImageUrl) ? (
-                          <RefreshCw className="w-4 h-4" />
-                        ) : (
-                          <Sparkles className="w-4 h-4" />
-                        )}
-                        {segment.isGeneratingStart || segment.isGeneratingEnd ? t('generating') : (segment.startImageUrl && segment.endImageUrl) ? t('regenerateImages') : t('generateImages')}
-                      </button>
-                      {(segment.startImageUrl && segment.endImageUrl) && (
-                        <div className="flex items-center gap-1 text-[9px] text-emerald-500 font-bold uppercase tracking-wider">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {t('imagesReady')}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Segment Selection Icons */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-[0.2em] px-2">{t('segments')}</h3>
+        <div className="flex flex-wrap gap-4 px-2">
+          {script.segments.map((segment) => (
+            <button
+              key={segment.id}
+              onClick={() => setSelectedSegmentId(segment.id)}
+              className={`relative w-16 h-16 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
+                selectedSegmentId === segment.id
+                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none scale-110 z-10'
+                  : 'bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 text-zinc-400 hover:border-indigo-300'
+              }`}
+            >
+              <span className="text-xs font-black">{segment.index}</span>
+              <div className="mt-1 flex gap-0.5">
+                {segment.startImageUrl && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
+                {segment.endImageUrl && <div className="w-1 h-1 rounded-full bg-emerald-400" />}
+              </div>
+              {selectedSegmentId === segment.id && (
+                <motion.div
+                  layoutId="activeSegment"
+                  className="absolute -bottom-2 w-1.5 h-1.5 bg-indigo-600 rounded-full"
+                />
+              )}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Selected Segment Detail View */}
+      <AnimatePresence mode="wait">
+        {selectedSegment && (
+          <motion.div
+            key={selectedSegment.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl"
+          >
+            <div className="p-8 space-y-8">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
+                    <span className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center text-sm font-black">
+                      {selectedSegment.index}
+                    </span>
+                    {t('segment')} {selectedSegment.index}
+                  </h3>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    {selectedSegment.startTime}s - {selectedSegment.endTime}s
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => handleGenerateImages(selectedSegment)}
+                    disabled={selectedSegment.isGeneratingStart || selectedSegment.isGeneratingEnd}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${
+                      (selectedSegment.startImageUrl && selectedSegment.endImageUrl)
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-500/20'
+                    } disabled:opacity-50`}
+                  >
+                    {selectedSegment.isGeneratingStart || selectedSegment.isGeneratingEnd ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (selectedSegment.startImageUrl && selectedSegment.endImageUrl) ? (
+                      <RefreshCw className="w-4 h-4" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {selectedSegment.isGeneratingStart || selectedSegment.isGeneratingEnd 
+                      ? t('generating') 
+                      : (selectedSegment.startImageUrl && selectedSegment.endImageUrl) 
+                        ? t('regenerateImages') 
+                        : t('generateImages')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                      <List className="w-3 h-3" />
+                      {t('visualDirection')}
+                    </label>
+                    <textarea
+                      value={selectedSegment.visualDirection}
+                      onChange={(e) => onUpdateSegment(selectedSegment.id, { visualDirection: e.target.value })}
+                      className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 text-sm text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-40 resize-none transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                      <Sparkles className="w-3 h-3" />
+                      {t('geminiPrompt')}
+                    </label>
+                    <div className="space-y-4">
+                      <div className="relative group">
+                        <textarea
+                          value={viPrompts[selectedSegment.id] || ''}
+                          onChange={(e) => setViPrompts(prev => ({ ...prev, [selectedSegment.id]: e.target.value }))}
+                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleRefinePrompt(selectedSegment.id))}
+                          className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 pr-14 text-sm font-medium text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none shadow-sm"
+                          placeholder={language === 'vi' ? "Chỉnh sửa bằng Tiếng Việt..." : "Refine with Vietnamese..."}
+                        />
+                        <button
+                          onClick={() => handleRefinePrompt(selectedSegment.id)}
+                          disabled={isTranslating[selectedSegment.id] || !viPrompts[selectedSegment.id]}
+                          className="absolute bottom-4 right-4 p-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl disabled:opacity-50 transition-all shadow-md"
+                        >
+                          {isTranslating[selectedSegment.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      <textarea
+                        value={selectedSegment.imagePrompt || ''}
+                        onChange={(e) => onUpdateSegment(selectedSegment.id, { imagePrompt: e.target.value })}
+                        className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 text-xs font-mono text-zinc-500 focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none"
+                        placeholder="English image prompt..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest text-center block">
+                      {t('startImage')}
+                    </label>
+                    <div className="aspect-[9/16] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner">
+                      {selectedSegment.startImageUrl ? (
+                        <>
+                          <img src={selectedSegment.startImageUrl} alt="Start" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                              onClick={() => {
+                                const a = document.createElement('a');
+                                a.href = selectedSegment.startImageUrl!;
+                                a.download = `segment-${selectedSegment.index}-start.png`;
+                                a.click();
+                              }}
+                              className="p-3 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
+                            >
+                              <Download className="w-6 h-6" />
+                            </button>
+                          </div>
+                        </>
+                      ) : selectedSegment.isGeneratingStart ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                          <span className="text-[10px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
+                        </div>
+                      ) : (
+                        <ImageIcon className="w-10 h-10 text-zinc-300" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest text-center block">
+                      {t('endImage')}
+                    </label>
+                    <div className="aspect-[9/16] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner">
+                      {selectedSegment.endImageUrl ? (
+                        <>
+                          <img src={selectedSegment.endImageUrl} alt="End" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                              onClick={() => {
+                                const a = document.createElement('a');
+                                a.href = selectedSegment.endImageUrl!;
+                                a.download = `segment-${selectedSegment.index}-end.png`;
+                                a.click();
+                              }}
+                              className="p-3 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
+                            >
+                              <Download className="w-6 h-6" />
+                            </button>
+                          </div>
+                        </>
+                      ) : selectedSegment.isGeneratingEnd ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                          <span className="text-[10px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
+                        </div>
+                      ) : (
+                        <ImageIcon className="w-10 h-10 text-zinc-300" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Fixed Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 flex justify-center z-50">
+        <button
+          onClick={onNext}
+          className="px-12 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-xl shadow-indigo-500/20 flex items-center gap-3 transition-all transform hover:scale-105 active:scale-95"
+        >
+          {t('next') || 'Tiếp theo'}
+          <PlayCircle className="w-5 h-5" />
+        </button>
       </div>
     </div>
   );

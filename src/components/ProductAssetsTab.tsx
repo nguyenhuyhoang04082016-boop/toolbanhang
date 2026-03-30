@@ -10,7 +10,7 @@ interface ProductAssetsTabProps {
   onUpdate: (updates: Partial<ProductInfo>) => void;
   onDeleteTemplate: (id: string) => void;
   onUseTemplate: (template: VisualTemplate) => void;
-  onGenerate: () => void;
+  onNext: () => void;
   isLoading: boolean;
   language: Language;
 }
@@ -21,7 +21,7 @@ export const ProductAssetsTab: React.FC<ProductAssetsTabProps> = ({
   onUpdate, 
   onDeleteTemplate, 
   onUseTemplate, 
-  onGenerate, 
+  onNext, 
   isLoading, 
   language 
 }) => {
@@ -287,40 +287,10 @@ export const ProductAssetsTab: React.FC<ProductAssetsTabProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Voiceover Settings */}
-      <section className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-indigo-600 font-bold uppercase tracking-wider text-xs">
-          <Sparkles className="w-4 h-4" />
-          {t('voiceoverSettings')}
-        </div>
-        <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
-          <div className="space-y-1">
-            <h4 className="text-sm font-bold text-zinc-900 dark:text-white">{t('hasVoiceover')}</h4>
-            <p className="text-xs text-zinc-500">
-              {language === 'vi' 
-                ? 'Tạo kịch bản có lời thoại tiếng Việt và khớp khẩu hình miệng cho nhân vật.' 
-                : 'Generate script with Vietnamese dialogue and lip-sync for the character.'}
-            </p>
-          </div>
-          <button
-            onClick={() => onUpdate({ hasVoiceover: !product.hasVoiceover })}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-              product.hasVoiceover ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                product.hasVoiceover ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
-      </section>
-
       <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-200 dark:border-zinc-800 p-4 z-40">
         <div className="max-w-3xl mx-auto">
           <button
-            onClick={onGenerate}
+            onClick={onNext}
             disabled={isLoading}
             className={`w-full py-4 rounded-2xl font-bold text-white shadow-2xl transition-all flex items-center justify-center gap-4 ${
               isLoading 
@@ -328,20 +298,8 @@ export const ProductAssetsTab: React.FC<ProductAssetsTabProps> = ({
                 : 'bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-indigo-200 dark:shadow-none'
             }`}
           >
-            {isLoading ? (
-              <>
-                <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                <div className="text-left">
-                  <div className="text-sm font-bold">{t('generatingScript')}</div>
-                  <div className="text-[10px] font-normal opacity-70">Gemini 2.5 Flash • {t('aiAnalyzing')}</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-6 h-6" />
-                <span className="text-lg uppercase tracking-tight">{t('generateScript')}</span>
-              </>
-            )}
+            <Sparkles className="w-6 h-6" />
+            <span className="text-lg uppercase tracking-tight">{t('next') || 'Tiếp theo'}</span>
           </button>
         </div>
       </div>

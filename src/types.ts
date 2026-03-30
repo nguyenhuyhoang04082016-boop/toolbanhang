@@ -20,6 +20,14 @@ export interface VisualTemplate {
   categories: ImageCategory[];
 }
 
+export type DialogueType = 'self-talk' | 'no-read' | 'none';
+
+export interface ScriptOrientation {
+  style: string;
+  dialogueType: DialogueType;
+  additionalNotes?: string;
+}
+
 export interface ProductInfo {
   name: string;
   category?: string;
@@ -29,6 +37,7 @@ export interface ProductInfo {
   referenceImages?: string[];
   imageCategories?: ImageCategory[];
   selectedTemplateId?: string;
+  scriptOrientation?: ScriptOrientation;
   
   // Legacy fields for compatibility if needed, but we'll focus on the above
   targetUser?: string;

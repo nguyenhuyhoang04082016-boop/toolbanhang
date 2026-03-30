@@ -15,6 +15,7 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
   const [veoKey, setVeoKey] = useState<string>(localStorage.getItem('manual_veo_api_key') || '');
   const [geminiModel, setGeminiModel] = useState<string>(localStorage.getItem('selected_gemini_model') || 'gemini-2.5-flash');
   const [veoModel, setVeoModel] = useState<string>(localStorage.getItem('selected_veo_model') || 'veo-3.1-fast-generate-preview');
+  const [mockMode, setMockMode] = useState<boolean>(localStorage.getItem('mock_mode') === 'true');
 
   const handleSelectKey = async () => {
     if (window.aistudio) {
@@ -32,6 +33,7 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
     }
     localStorage.setItem('selected_gemini_model', geminiModel);
     localStorage.setItem('selected_veo_model', veoModel);
+    localStorage.setItem('mock_mode', String(mockMode));
     onSave();
   };
 
@@ -40,10 +42,12 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
     localStorage.removeItem('manual_veo_api_key');
     localStorage.removeItem('selected_gemini_model');
     localStorage.removeItem('selected_veo_model');
+    localStorage.removeItem('mock_mode');
     setGeminiKey('');
     setVeoKey('');
     setGeminiModel('gemini-2.5-flash');
     setVeoModel('veo-3.1-fast-generate-preview');
+    setMockMode(false);
     onSave();
   };
 
@@ -60,12 +64,35 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
         </p>
       </div>
 
+      <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-700 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-left">
+            <p className="text-sm font-bold text-zinc-900 dark:text-white">{t('mockMode')}</p>
+            <p className="text-[10px] text-zinc-500">{t('mockModeDesc')}</p>
+          </div>
+          <button
+            onClick={() => setMockMode(!mockMode)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              mockMode ? 'bg-emerald-600' : 'bg-zinc-300 dark:bg-zinc-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                mockMode ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
       <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 rounded-2xl p-4 text-left flex gap-3">
         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="text-sm font-bold text-amber-800 dark:text-amber-200">{t('freeAccountNote')}</p>
           <p className="text-xs text-amber-700 dark:text-amber-300/70 leading-relaxed">
-            {t('freeAccountNoteDesc')}
+            {language === 'vi' 
+              ? 'Lưu ý: Veo 3 và Gemini 3.1 yêu cầu tài khoản Google Cloud Trả phí (Paid). Nếu bạn dùng gói Miễn phí, vui lòng chọn Gemini 2.5 Flash trong phần cài đặt.' 
+              : 'Note: Veo 3 and Gemini 3.1 require a Paid Google Cloud account. If you are using a Free plan, please select Gemini 2.5 Flash in settings.'}
           </p>
         </div>
       </div>
@@ -204,7 +231,14 @@ export const ApiKeyGuard: React.FC<ApiKeyGuardProps> = ({ children, language }) 
   const checkApiKey = async () => {
     const geminiKey = localStorage.getItem('manual_gemini_api_key');
     const veoKey = localStorage.getItem('manual_veo_api_key');
+    const isMockMode = localStorage.getItem('mock_mode') === 'true';
     
+    // If Mock Mode is enabled, we allow access
+    if (isMockMode) {
+      setHasApiKey(true);
+      return;
+    }
+
     // If both manual keys are set, we are good
     if (geminiKey && veoKey) {
       setHasApiKey(true);
