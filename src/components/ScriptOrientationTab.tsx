@@ -8,6 +8,7 @@ interface ScriptOrientationTabProps {
   product: ProductInfo;
   onUpdate: (updates: Partial<ProductInfo>) => void;
   onGenerate: () => void;
+  onNext?: () => void;
   isLoading: boolean;
   language: Language;
 }
@@ -16,6 +17,7 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
   product,
   onUpdate,
   onGenerate,
+  onNext,
   isLoading,
   language
 }) => {
@@ -149,11 +151,11 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
       </section>
 
       <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-200 dark:border-zinc-800 p-4 z-40">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto flex gap-4">
           <button
             onClick={onGenerate}
             disabled={isLoading}
-            className={`w-full py-4 rounded-2xl font-bold text-white shadow-2xl transition-all flex items-center justify-center gap-4 ${
+            className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-2xl transition-all flex items-center justify-center gap-4 ${
               isLoading 
                 ? 'bg-zinc-400 cursor-not-allowed' 
                 : 'bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-indigo-200 dark:shadow-none'
@@ -174,6 +176,16 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
               </>
             )}
           </button>
+
+          {product.scriptOrientation && !isLoading && (
+            <button
+              onClick={onNext}
+              className="px-8 py-4 rounded-2xl font-bold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="text-lg uppercase tracking-tight">{t('next') || 'Tiếp theo'}</span>
+              <ArrowRight className="w-6 h-6" />
+            </button>
+          )}
         </div>
       </div>
     </div>

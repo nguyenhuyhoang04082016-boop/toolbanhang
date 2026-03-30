@@ -412,91 +412,100 @@ export default function App() {
       <main className="flex flex-col min-h-[calc(100vh-64px)]">
         {/* Main Content: Form & Images */}
         <div className="w-full bg-white dark:bg-zinc-950 flex flex-col min-h-[calc(100vh-64px)]">
-          {/* Tabs Header */}
-          <div className="flex border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-950 z-40 overflow-x-auto scrollbar-hide">
-            <button
-              onClick={() => setActiveTab('form')}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'form'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <Info className="w-4 h-4" />
-              {t('productInfo')}
-            </button>
-            <button
-              onClick={() => setActiveTab('characterEnv')}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'characterEnv'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              {t('characterAndEnv')}
-            </button>
-            <button
-              onClick={() => setActiveTab('productImages')}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'productImages'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <ImageIcon className="w-4 h-4" />
-              {t('productImages')}
-            </button>
-            <button
-              onClick={() => setActiveTab('orientation')}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'orientation'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              {t('scriptOrientation') || 'Định hướng'}
-            </button>
-            <button
-              onClick={() => setActiveTab('results')}
-              disabled={!currentScript}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript 
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
-                  : activeTab === 'results'
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              {t('scriptAndImages') || 'Kịch bản & Ảnh'}
-            </button>
-            <button
-              onClick={() => setActiveTab('videoGen')}
-              disabled={!currentScript}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                !currentScript 
-                  ? 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed' 
-                  : activeTab === 'videoGen'
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <PlayCircle className="w-4 h-4" />
-              {t('createVideo') || 'Tạo Video'}
-            </button>
-            <button
-              onClick={() => setActiveTab('templates')}
-              className={`flex-1 min-w-[120px] py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'templates'
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30 dark:bg-indigo-900/10'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <Bookmark className="w-4 h-4" />
-              {t('savedTemplates')}
-            </button>
+          {/* Workflow Stepper */}
+          <div className="bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-50">
+            <div className="max-w-6xl mx-auto px-4 py-6">
+              <div className="flex items-center justify-between relative">
+                {/* Progress Line */}
+                <div className="absolute top-5 left-0 w-full h-0.5 bg-zinc-100 dark:bg-zinc-800 -z-10" />
+                <div 
+                  className="absolute top-5 left-0 h-0.5 bg-indigo-600 transition-all duration-500 -z-10" 
+                  style={{ 
+                    width: `${(['form', 'characterEnv', 'productImages', 'orientation', 'results', 'videoGen'].indexOf(activeTab) / 5) * 100}%` 
+                  }} 
+                />
+
+                {[
+                  { id: 'form', icon: Info, label: t('productInfo') },
+                  { id: 'characterEnv', icon: Sparkles, label: t('characterAndEnv') },
+                  { id: 'productImages', icon: ImageIcon, label: t('productImages') },
+                  { id: 'orientation', icon: Sparkles, label: t('scriptOrientation') },
+                  { id: 'results', icon: List, label: t('scriptAndImages'), disabled: !currentScript },
+                  { id: 'videoGen', icon: PlayCircle, label: t('createVideo'), disabled: !currentScript }
+                ].map((step, index) => {
+                  const Icon = step.icon;
+                  const isActive = activeTab === step.id;
+                  const isCompleted = ['form', 'characterEnv', 'productImages', 'orientation', 'results', 'videoGen'].indexOf(activeTab) > index;
+                  const isDisabled = step.disabled;
+
+                  return (
+                    <button
+                      key={step.id}
+                      disabled={isDisabled}
+                      onClick={() => setActiveTab(step.id as any)}
+                      className={`flex flex-col items-center gap-2 group transition-all ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                        isActive 
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none scale-110' 
+                          : isCompleted
+                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400 group-hover:border-indigo-300'
+                      }`}>
+                        {isCompleted ? (
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </motion.div>
+                        ) : (
+                          <span className="text-sm font-black">{index + 1}</span>
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                        isActive ? 'text-indigo-600' : isCompleted ? 'text-emerald-600' : 'text-zinc-400'
+                      }`}>
+                        {step.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation & Utility Bar */}
+          <div className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {activeTab !== 'form' && activeTab !== 'templates' && (
+                <button
+                  onClick={() => {
+                    const steps: any[] = ['form', 'characterEnv', 'productImages', 'orientation', 'results', 'videoGen'];
+                    const currentIndex = steps.indexOf(activeTab);
+                    if (currentIndex > 0) setActiveTab(steps[currentIndex - 1]);
+                  }}
+                  className="flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-indigo-600 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  {language === 'vi' ? 'Quay lại' : 'Back'}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('templates')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                  activeTab === 'templates'
+                    ? 'bg-indigo-600 text-white shadow-lg'
+                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50'
+                }`}
+              >
+                <Bookmark className="w-4 h-4" />
+                {t('savedTemplates')}
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -587,6 +596,7 @@ export default function App() {
                         product={productDraft}
                         onUpdate={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
                         onGenerate={() => handleGenerate(productDraft)}
+                        onNext={() => setActiveTab('results')}
                         isLoading={isLoading}
                         language={language}
                       />

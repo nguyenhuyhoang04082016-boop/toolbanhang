@@ -356,6 +356,27 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Fixed Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 flex justify-center z-50">
+        <button
+          onClick={() => {
+            // For now, just show a success message or go back to start
+            alert(language === 'vi' ? 'Chúc mừng! Bạn đã hoàn thành quy trình tạo video.' : 'Congratulations! You have completed the video creation process.');
+            window.location.reload(); // Simple way to reset for now, or we could just go to 'form'
+          }}
+          className="px-12 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-xl shadow-emerald-500/20 flex items-center gap-3 transition-all transform hover:scale-105 active:scale-95"
+        >
+          {language === 'vi' ? 'Hoàn tất' : 'Finish'}
+          <Check className="w-5 h-5" />
+        </button>
+      </div>
     </div>
   );
 };
+
+const Check = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+  </svg>
+);
