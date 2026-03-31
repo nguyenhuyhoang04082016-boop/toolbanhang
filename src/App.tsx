@@ -152,12 +152,12 @@ export default function App() {
       };
       
       setCurrentScript(newScript);
-      setHistory((prev) => [newScript, ...prev].slice(0, 5));
+      setHistory((prev) => [newScript, ...prev].slice(0, 20));
 
       // 2. Generate Images for all segments
       setAutomationProgress({ step: 'images', message: language === 'vi' ? 'Đang tạo hình ảnh...' : 'Generating images...', percent: 30 });
       const updatedSegments = [...newScript.segments];
-      const limitedRefs = allImages.slice(0, 10);
+      const limitedRefs = allImages.slice(0, 20);
 
       for (let i = 0; i < updatedSegments.length; i++) {
         const segment = updatedSegments[i];
@@ -434,7 +434,7 @@ export default function App() {
 
   // Sync history to local storage
   useEffect(() => {
-    safeSetItem('adscript_history', history.slice(0, 5), true);
+    safeSetItem('adscript_history', history.slice(0, 20), true);
   }, [history]);
 
   // Sync templates to local storage
@@ -509,7 +509,7 @@ export default function App() {
       };
       
       setCurrentScript(newScript);
-      setHistory((prev) => [newScript, ...prev].slice(0, 5));
+      setHistory((prev) => [newScript, ...prev].slice(0, 20));
       setActiveTab('results'); // Switch to results tab to review prompts
 
     } catch (error: any) {

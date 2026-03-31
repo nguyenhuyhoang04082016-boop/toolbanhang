@@ -345,7 +345,8 @@ export async function generateAdScript(
   - IMPORTANT: If a character image is provided, describe the specific person from that image.
   - The script must be seamless and natural.
   - Split the script into segments of exactly 8 seconds each.
-  - Structure: exactly ${Math.ceil((product.totalLength || 32) / 8)} segments to match the total duration of ${product.totalLength || 32}s.
+  - MANDATORY: You MUST generate exactly ${Math.ceil((product.totalLength || 32) / 8)} segments.
+  - For a total duration of ${product.totalLength || 32}s, you MUST provide ${Math.ceil((product.totalLength || 32) / 8)} distinct segments in the "segments" array.
   
   Format: JSON object with:
   - "productAnalysis": { "features": [], "specs": [], "usage": [], "benefits": [] }
@@ -386,7 +387,7 @@ export async function generateAdScript(
     ...(product.imageCategories || []).flatMap(c => c.images)
   ];
 
-  const imageParts = allImages.slice(0, 10).map(img => {
+  const imageParts = allImages.slice(0, 20).map(img => {
     const { mimeType, data } = getImageData(img);
     return { inlineData: { mimeType, data } };
   });
@@ -553,7 +554,7 @@ export async function generateImagePrompts(
     return { mimeType, data };
   };
 
-  const imageParts = referenceImages.slice(0, 10).map(img => {
+  const imageParts = referenceImages.slice(0, 20).map(img => {
     const { mimeType, data } = getImageData(img);
     return { inlineData: { mimeType, data } };
   });
@@ -717,7 +718,7 @@ export async function generateVideoPrompts(
     return { mimeType, data };
   };
 
-  const imageParts = referenceImages.slice(0, 10).map(img => {
+  const imageParts = referenceImages.slice(0, 20).map(img => {
     const { mimeType, data } = getImageData(img);
     return { inlineData: { mimeType, data } };
   });

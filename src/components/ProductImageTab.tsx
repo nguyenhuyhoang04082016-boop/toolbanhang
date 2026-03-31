@@ -98,8 +98,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         ...(script?.productInfo?.imageCategories || []).flatMap(c => c.images)
       ];
       
-      // Limit to 10 images to avoid token limits or performance issues
-      const limitedRefs = referenceImages.slice(0, 10);
+      // Limit to 20 images to avoid token limits or performance issues
+      const limitedRefs = referenceImages.slice(0, 20);
       
       const [startUrl, endUrl] = await Promise.all([
         generateImage(segment.imagePrompt + ", start of the scene, high quality", ratio, limitedRefs),
