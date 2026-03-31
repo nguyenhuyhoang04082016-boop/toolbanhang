@@ -72,6 +72,20 @@ const apiQueue = new TaskQueue(2); // Limit to 2 concurrent calls to avoid 429s
 const cache = new Map<string, any>();
 
 /**
+ * Safely extract text from Gemini response, avoiding warnings for non-text parts
+ */
+function extractTextFromResponse(response: any): string {
+  if (!response || !response.candidates || !response.candidates[0] || !response.candidates[0].content) {
+    return "";
+  }
+  const parts = response.candidates[0].content.parts || [];
+  return parts
+    .filter((p: any) => p.text)
+    .map((p: any) => p.text)
+    .join("");
+}
+
+/**
  * Helper to call Gemini with exponential backoff and retries
  */
 async function callGeminiWithRetry(
@@ -181,6 +195,64 @@ async function callGeminiWithRetry(
   });
 }
 
+export async function inferScriptOrientation(product: ProductInfo, language: Language): Promise<{ 
+  style: string, 
+  dialogueType: string,
+  targetAudience: string,
+  keyMessage: string,
+  toneOfVoice: string
+}> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  
+  const prompt = `Based on the following product information, suggest the most suitable video style and dialogue type for a high-converting short-form video (TikTok/Reels).
+  
+  Product Name: ${product.name}
+  Category: ${product.category || 'N/A'}
+  Additional Requirements: ${product.additionalRequirements || 'None'}
+  
+  Return a JSON object with:
+  - "style": One of ['lifestyle', 'cinematic', 'vlog', 'unboxing', 'tutorial', 'storytelling', 'comedy', 'educational']
+  - "dialogueType": One of ['self-talk', 'no-read', 'none']
+  - "targetAudience": A short description of the ideal customer
+  - "keyMessage": The most important point to convey
+  - "toneOfVoice": One of ['energetic', 'professional', 'friendly', 'luxury', 'funny', 'emotional']
+  
+  Choose the style that best fits the product's nature and the dialogue type that would be most engaging.
+  `;
+
+  try {
+    const response = await callGeminiWithRetry({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            style: { type: Type.STRING },
+            dialogueType: { type: Type.STRING },
+            targetAudience: { type: Type.STRING },
+            keyMessage: { type: Type.STRING },
+            toneOfVoice: { type: Type.STRING },
+          },
+          required: ["style", "dialogueType", "targetAudience", "keyMessage", "toneOfVoice"]
+        }
+      }
+    });
+
+    return JSON.parse(extractTextFromResponse(response) || '{"style": "lifestyle", "dialogueType": "self-talk", "targetAudience": "General", "keyMessage": "N/A", "toneOfVoice": "friendly"}');
+  } catch (error) {
+    console.warn("Failed to infer orientation, using defaults", error);
+    return { 
+      style: 'lifestyle', 
+      dialogueType: 'self-talk',
+      targetAudience: 'General',
+      keyMessage: 'N/A',
+      toneOfVoice: 'friendly'
+    };
+  }
+}
+
 export async function generateAdScript(
   product: ProductInfo,
   language: Language,
@@ -252,6 +324,9 @@ export async function generateAdScript(
   Based on the analysis and user requirements, generate a high-converting, seamless ad script for Veo 3.
   - Ad Style: ${product.scriptOrientation?.style || product.videoType || 'lifestyle'}.
   - Dialogue Type: ${product.scriptOrientation?.dialogueType || 'self-talk'}.
+  - Target Audience: ${product.scriptOrientation?.targetAudience || 'General'}.
+  - Key Message: ${product.scriptOrientation?.keyMessage || 'N/A'}.
+  - Tone of Voice: ${product.scriptOrientation?.toneOfVoice || 'friendly'}.
   
   DIALOGUE RULES:
   ${product.scriptOrientation?.dialogueType === 'self-talk' ? `
@@ -269,8 +344,8 @@ export async function generateAdScript(
   
   - IMPORTANT: If a character image is provided, describe the specific person from that image.
   - The script must be seamless and natural.
-  - Split the script into segments of exactly 6 seconds each.
-  - Structure: exactly ${Math.ceil((product.totalLength || 30) / 6)} segments to match the total duration of ${product.totalLength || 30}s.
+  - Split the script into segments of exactly 8 seconds each.
+  - Structure: exactly ${Math.ceil((product.totalLength || 32) / 8)} segments to match the total duration of ${product.totalLength || 32}s.
   
   Format: JSON object with:
   - "productAnalysis": { "features": [], "specs": [], "usage": [], "benefits": [] }
@@ -287,7 +362,7 @@ export async function generateAdScript(
   `;
 
   const prompt = `
-  Analyze the product images and generate a 6s-per-segment ad script.
+  Analyze the product images and generate a 8s-per-segment ad script.
   Product Name: ${product.name}
   Category: ${product.category || 'N/A'}
   Ratio: ${product.ratio}
@@ -360,7 +435,7 @@ export async function generateAdScript(
       },
     });
 
-    const rawJson = response.text;
+    const rawJson = extractTextFromResponse(response);
     if (!rawJson) throw new Error("No response from AI");
     
     const result = JSON.parse(rawJson);
@@ -372,8 +447,8 @@ export async function generateAdScript(
       segments: segments.map((s, i) => ({
         id: Math.random().toString(36).substr(2, 9),
         index: i + 1,
-        startTime: i * 6,
-        endTime: (i + 1) * 6,
+        startTime: i * 8,
+        endTime: (i + 1) * 8,
         visualDirection: s.visualDirection,
         voiceover: s.voiceover || "",
         onScreenText: "",
@@ -428,7 +503,7 @@ export async function generateCharacterProfile(product: ProductInfo): Promise<st
     contents,
   });
 
-  return response.text || "A friendly person using the product.";
+  return extractTextFromResponse(response) || "A friendly person using the product.";
 }
 
 export async function generateImagePrompts(
@@ -499,7 +574,7 @@ export async function generateImagePrompts(
     }
   });
 
-  return JSON.parse(response.text || "[]");
+  return JSON.parse(extractTextFromResponse(response) || "[]");
 }
 
 export async function generateImage(
@@ -557,18 +632,24 @@ export async function generateImage(
       throw new Error("Nội dung bị chặn bởi bộ lọc an toàn.");
     }
 
-    // Handle permission errors
-    if (response.text?.includes("not allowed") || response.text?.includes("permission denied")) {
-      throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Vui lòng sử dụng API Key từ một Project có bật thanh toán (Paid).");
-    }
-
-    for (const part of candidate?.content?.parts || []) {
+    // Check for non-text parts (inlineData) which might contain the image
+    const responseParts = candidate?.content?.parts || [];
+    for (const part of responseParts) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
+
+    // Handle permission errors or text-only responses that indicate failure
+    const responseText = extractTextFromResponse(response);
+    if (responseText.toLowerCase().includes("not allowed") || 
+        responseText.toLowerCase().includes("permission denied") ||
+        responseText.toLowerCase().includes("billing") ||
+        responseText.toLowerCase().includes("paid account")) {
+      throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Vui lòng sử dụng API Key từ một Project có bật thanh toán (Paid).");
+    }
     
-    throw new Error("Không thể tạo ảnh từ câu lệnh này. Có thể do giới hạn của tài khoản miễn phí.");
+    throw new Error("Không thể tạo ảnh từ câu lệnh này. Có thể do giới hạn của tài khoản miễn phí hoặc nội dung yêu cầu không hợp lệ.");
   } catch (error: any) {
     const msg = error?.message || "";
     if (msg.includes("403") || msg.includes("permission") || msg.includes("quota") || msg.includes("limit")) {
@@ -657,7 +738,7 @@ export async function generateVideoPrompts(
     }
   });
 
-  return JSON.parse(response.text || "[]");
+  return JSON.parse(extractTextFromResponse(response) || "[]");
 }
 
 export async function generateVideo(
@@ -785,7 +866,7 @@ export async function refineImagePrompt(
     contents: prompt,
   });
 
-  return response.text || currentPrompt;
+  return extractTextFromResponse(response) || currentPrompt;
 }
 
 export async function translatePrompt(text: string, targetLanguage: 'English' | 'Vietnamese' = 'English'): Promise<string> {
@@ -801,7 +882,7 @@ export async function translatePrompt(text: string, targetLanguage: 'English' | 
     contents: prompt,
   });
 
-  return response.text || text;
+  return extractTextFromResponse(response) || text;
 }
 
 export async function generateAffiliateIdeas(info: any, language: string): Promise<any[]> {

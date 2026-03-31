@@ -9,7 +9,7 @@ import { VideoGenerationTab } from './components/VideoGenerationTab';
 import { SavedTemplatesTab } from './components/SavedTemplatesTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
 import { AdScript, AdSegment, Language, ProductInfo, SavedTemplate, VisualTemplate } from './types';
-import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateVideoPrompts } from './services/geminiService';
+import { generateAdScript, generateCharacterProfile, generateImagePrompts, generateVideoPrompts, inferScriptOrientation } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
 import { Info, Image as ImageIcon, Bookmark, Globe, Sparkles, ShoppingCart, Trash2, Plus, List, PlayCircle } from 'lucide-react';
 
@@ -35,8 +35,7 @@ export default function App() {
     name: '',
     category: '',
     ratio: '9:16',
-    videoType: 'review',
-    totalLength: 30,
+    totalLength: 32,
     additionalRequirements: '',
     referenceImages: [],
     imageCategories: [],
@@ -44,6 +43,9 @@ export default function App() {
     scriptOrientation: {
       style: 'lifestyle',
       dialogueType: 'self-talk',
+      targetAudience: '',
+      keyMessage: '',
+      toneOfVoice: 'friendly',
       additionalNotes: ''
     }
   });
@@ -110,16 +112,19 @@ export default function App() {
       if (info.imageCategories) {
         info.imageCategories = cleanImageCategories(info.imageCategories);
       }
+      // Also strip base64 from scriptOrientation if any (though unlikely)
     };
 
     const cleanScript = (script: any) => {
+      if (!script) return;
       if (script.productInfo) cleanProductInfo(script.productInfo);
       if (script.segments) {
         script.segments = script.segments.map((seg: any) => ({
           ...seg,
           startImageUrl: undefined,
           endImageUrl: undefined,
-          videoUrl: undefined
+          videoUrl: undefined,
+          // Also strip prompts if they are huge, but usually they are fine
         }));
       }
     };
@@ -160,8 +165,9 @@ export default function App() {
         console.warn(`LocalStorage quota exceeded for ${key}. Attempting cleanup.`);
         try {
           // 1. Try clearing history and templates first as they are less critical
-          if (key !== 'adscript_history') localStorage.removeItem('adscript_history');
-          if (key !== 'adscript_templates') localStorage.removeItem('adscript_templates');
+          localStorage.removeItem('adscript_history');
+          localStorage.removeItem('adscript_templates');
+          localStorage.removeItem('current_adscript');
           
           try {
             localStorage.setItem(key, JSON.stringify(shouldStrip ? stripImages(value) : value));
@@ -175,8 +181,8 @@ export default function App() {
                 const limited = value.slice(0, 2);
                 localStorage.setItem(key, JSON.stringify(stripImages(limited, true)));
               }
-            } else if (key === 'current_adscript') {
-              // For current script, strip all images
+            } else if (key === 'current_adscript' || key === 'adscript_history') {
+              // For scripts and history, strip all images
               localStorage.setItem(key, JSON.stringify(stripImages(value, true)));
             } else {
               // For others, just try saving a very small version
@@ -192,6 +198,7 @@ export default function App() {
             localStorage.removeItem('adscript_history');
             localStorage.removeItem('adscript_templates');
             localStorage.removeItem('visual_templates');
+            localStorage.removeItem('current_adscript');
             
             // Try saving the current one again (completely stripped)
             localStorage.setItem(key, JSON.stringify(stripImages(value, true)));
@@ -205,10 +212,10 @@ export default function App() {
     }
   };
 
-  // Sync current script to local storage
+  // Sync current script to local storage - Re-enabled with stripping
   useEffect(() => {
     if (currentScript) {
-      safeSetItem('current_adscript', currentScript);
+      safeSetItem('current_adscript', currentScript, true);
     }
   }, [currentScript]);
 
@@ -239,8 +246,23 @@ export default function App() {
   const handleGenerate = async (product: ProductInfo) => {
     setIsLoading(true);
     try {
+      // Ensure orientation is set
+      let finalProduct = { ...product };
+      if (!finalProduct.scriptOrientation || !finalProduct.scriptOrientation.style) {
+        const inferred = await inferScriptOrientation(product, language);
+        finalProduct.scriptOrientation = {
+          ...finalProduct.scriptOrientation,
+          style: inferred.style,
+          dialogueType: inferred.dialogueType as any,
+          targetAudience: inferred.targetAudience,
+          keyMessage: inferred.keyMessage,
+          toneOfVoice: inferred.toneOfVoice
+        };
+        setProductDraft(finalProduct);
+      }
+
       // 1. Generate Script
-      const { segments, seamlessScript, productAnalysis } = await generateAdScript(product, language, brandVoice);
+      const { segments, seamlessScript, productAnalysis } = await generateAdScript(finalProduct, language, brandVoice);
       
       // 2. Generate Character Profile for consistency
       const characterProfile = await generateCharacterProfile(product);
@@ -549,7 +571,30 @@ export default function App() {
                   {activeTab === 'form' ? (
                     <div className="max-w-4xl mx-auto">
                       <ProductForm 
-                        onSubmit={() => setActiveTab('characterEnv')} 
+                        onSubmit={async (data) => {
+                          setIsLoading(true);
+                          try {
+                            const inferred = await inferScriptOrientation(data, language);
+                            setProductDraft(prev => ({
+                              ...prev,
+                              ...data,
+                              scriptOrientation: {
+                                ...prev.scriptOrientation,
+                                style: inferred.style,
+                                dialogueType: inferred.dialogueType as any,
+                                targetAudience: inferred.targetAudience,
+                                keyMessage: inferred.keyMessage,
+                                toneOfVoice: inferred.toneOfVoice
+                              }
+                            }));
+                            setActiveTab('characterEnv');
+                          } catch (error) {
+                            console.error("Failed to infer orientation", error);
+                            setActiveTab('characterEnv');
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }} 
                         onSaveTemplate={(data) => {
                           const newTemplate: SavedTemplate = {
                             id: Math.random().toString(36).substr(2, 9),

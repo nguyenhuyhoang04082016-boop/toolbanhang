@@ -25,6 +25,9 @@ export type DialogueType = 'self-talk' | 'no-read' | 'none';
 export interface ScriptOrientation {
   style: string;
   dialogueType: DialogueType;
+  targetAudience?: string;
+  keyMessage?: string;
+  toneOfVoice?: string;
   additionalNotes?: string;
 }
 

@@ -25,7 +25,10 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
 
   const orientation = product.scriptOrientation || {
     style: 'review',
-    dialogueType: 'self-talk'
+    dialogueType: 'self-talk',
+    targetAudience: '',
+    keyMessage: '',
+    toneOfVoice: 'friendly'
   };
 
   const updateOrientation = (updates: Partial<ScriptOrientation>) => {
@@ -64,6 +67,15 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
     },
   ];
 
+  const tones = [
+    { id: 'energetic', label: language === 'vi' ? 'Năng động' : 'Energetic' },
+    { id: 'professional', label: language === 'vi' ? 'Chuyên nghiệp' : 'Professional' },
+    { id: 'friendly', label: language === 'vi' ? 'Thân thiện' : 'Friendly' },
+    { id: 'luxury', label: language === 'vi' ? 'Sang trọng' : 'Luxury' },
+    { id: 'funny', label: language === 'vi' ? 'Hài hước' : 'Funny' },
+    { id: 'emotional', label: language === 'vi' ? 'Cảm xúc' : 'Emotional' },
+  ];
+
   return (
     <div className="p-6 space-y-8 pb-32">
       <div className="border-b border-zinc-100 dark:border-zinc-800 pb-4">
@@ -78,77 +90,134 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
         </p>
       </div>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-          {language === 'vi' ? 'Phong cách quảng cáo' : 'Ad Style'}
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {styles.map((style) => (
-            <button
-              key={style.id}
-              onClick={() => updateOrientation({ style: style.id })}
-              className={`p-4 rounded-2xl border-2 transition-all text-left space-y-2 ${
-                orientation.style === style.id
-                  ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400'
-                  : 'border-zinc-100 dark:border-zinc-800 hover:border-indigo-200 dark:hover:border-indigo-900/50'
-              }`}
-            >
-              <div className={orientation.style === style.id ? 'text-indigo-600' : 'text-zinc-400'}>
-                {style.icon}
-              </div>
-              <div className="text-sm font-bold">{style.label}</div>
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-8">
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Video className="w-4 h-4 text-indigo-500" />
+              {language === 'vi' ? 'Phong cách quảng cáo' : 'Ad Style'}
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {styles.map((style) => (
+                <button
+                  key={style.id}
+                  onClick={() => updateOrientation({ style: style.id })}
+                  className={`p-4 rounded-2xl border-2 transition-all text-left space-y-2 ${
+                    orientation.style === style.id
+                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400'
+                      : 'border-zinc-100 dark:border-zinc-800 hover:border-indigo-200 dark:hover:border-indigo-900/50'
+                  }`}
+                >
+                  <div className={orientation.style === style.id ? 'text-indigo-600' : 'text-zinc-400'}>
+                    {style.icon}
+                  </div>
+                  <div className="text-sm font-bold">{style.label}</div>
+                </button>
+              ))}
+            </div>
+          </section>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-          {language === 'vi' ? 'Kịch bản lời thoại' : 'Dialogue Script'}
-        </h3>
-        <div className="space-y-3">
-          {dialogueTypes.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => updateOrientation({ dialogueType: type.id })}
-              className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-4 ${
-                orientation.dialogueType === type.id
-                  ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20'
-                  : 'border-zinc-100 dark:border-zinc-800 hover:border-indigo-200 dark:hover:border-indigo-900/50'
-              }`}
-            >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                orientation.dialogueType === type.id ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
-              }`}>
-                {type.icon}
-              </div>
-              <div className="flex-1">
-                <div className={`text-sm font-bold ${orientation.dialogueType === type.id ? 'text-indigo-700 dark:text-indigo-400' : 'text-zinc-900 dark:text-white'}`}>
-                  {type.label}
-                </div>
-                <div className="text-xs text-zinc-500">{type.desc}</div>
-              </div>
-              {orientation.dialogueType === type.id && (
-                <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
-                  <Check className="w-4 h-4 text-white" />
-                </div>
-              )}
-            </button>
-          ))}
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Mic className="w-4 h-4 text-indigo-500" />
+              {language === 'vi' ? 'Kịch bản lời thoại' : 'Dialogue Script'}
+            </h3>
+            <div className="space-y-3">
+              {dialogueTypes.map((type) => (
+                <button
+                  key={type.id}
+                  onClick={() => updateOrientation({ dialogueType: type.id })}
+                  className={`w-full p-4 rounded-2xl border-2 transition-all text-left flex items-center gap-4 ${
+                    orientation.dialogueType === type.id
+                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20'
+                      : 'border-zinc-100 dark:border-zinc-800 hover:border-indigo-200 dark:hover:border-indigo-900/50'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    orientation.dialogueType === type.id ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                  }`}>
+                    {type.icon}
+                  </div>
+                  <div className="flex-1">
+                    <div className={`text-sm font-bold ${orientation.dialogueType === type.id ? 'text-indigo-700 dark:text-indigo-400' : 'text-zinc-900 dark:text-white'}`}>
+                      {type.label}
+                    </div>
+                    <div className="text-xs text-zinc-500">{type.desc}</div>
+                  </div>
+                  {orientation.dialogueType === type.id && (
+                    <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
-      </section>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-          {language === 'vi' ? 'Ghi chú bổ sung' : 'Additional Notes'}
-        </h3>
-        <textarea
-          value={orientation.additionalNotes || ''}
-          onChange={(e) => updateOrientation({ additionalNotes: e.target.value })}
-          placeholder={language === 'vi' ? 'Nhập thêm yêu cầu đặc biệt cho kịch bản...' : 'Enter special requirements for the script...'}
-          className="w-full h-32 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
-        />
-      </section>
+        <div className="space-y-8">
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+              {language === 'vi' ? 'Nội dung bổ sung' : 'Additional Content'}
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-500 uppercase">{language === 'vi' ? 'Đối tượng mục tiêu' : 'Target Audience'}</label>
+                <input
+                  type="text"
+                  value={orientation.targetAudience || ''}
+                  onChange={(e) => updateOrientation({ targetAudience: e.target.value })}
+                  placeholder={language === 'vi' ? 'VD: Mẹ bỉm sữa, Gen Z, Dân văn phòng...' : 'e.g. Busy moms, Gen Z, Office workers...'}
+                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-500 uppercase">{language === 'vi' ? 'Thông điệp chính' : 'Key Message'}</label>
+                <input
+                  type="text"
+                  value={orientation.keyMessage || ''}
+                  onChange={(e) => updateOrientation({ keyMessage: e.target.value })}
+                  placeholder={language === 'vi' ? 'VD: Giải pháp tiết kiệm thời gian tối ưu...' : 'e.g. The ultimate time-saving solution...'}
+                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-500 uppercase">{language === 'vi' ? 'Tông giọng' : 'Tone of Voice'}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {tones.map((tone) => (
+                    <button
+                      key={tone.id}
+                      onClick={() => updateOrientation({ toneOfVoice: tone.id })}
+                      className={`py-2 px-1 rounded-lg text-[10px] font-bold border transition-all ${
+                        orientation.toneOfVoice === tone.id
+                          ? 'bg-indigo-600 border-indigo-600 text-white'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-600 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400 hover:border-indigo-300'
+                      }`}
+                    >
+                      {tone.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+              {language === 'vi' ? 'Ghi chú đặc biệt' : 'Special Notes'}
+            </h3>
+            <textarea
+              value={orientation.additionalNotes || ''}
+              onChange={(e) => updateOrientation({ additionalNotes: e.target.value })}
+              placeholder={language === 'vi' ? 'Nhập thêm yêu cầu đặc biệt cho kịch bản...' : 'Enter special requirements for the script...'}
+              className="w-full h-24 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none text-sm"
+            />
+          </section>
+        </div>
+      </div>
 
       <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-200 dark:border-zinc-800 p-4 z-40">
         <div className="max-w-3xl mx-auto flex gap-4">

@@ -17,8 +17,7 @@ const initialData: ProductInfo = {
   name: '',
   category: '',
   ratio: '9:16',
-  videoType: 'review',
-  totalLength: 30,
+  totalLength: 32,
   additionalRequirements: '',
   referenceImages: [],
 };
@@ -183,21 +182,21 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
             <div className="flex items-center gap-4">
               <input
                 type="range"
-                min="6"
-                max="60"
-                step="6"
-                value={formData.totalLength || 30}
+                min="8"
+                max="64"
+                step="8"
+                value={formData.totalLength || 32}
                 onChange={(e) => updateFormData({ totalLength: parseInt(e.target.value) })}
                 className="flex-1 h-2 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
               />
               <span className="text-lg font-bold text-indigo-600 w-12 text-center">
-                {formData.totalLength || 30}s
+                {formData.totalLength || 32}s
               </span>
             </div>
             <p className="text-[10px] text-zinc-500 italic">
               {language === 'vi' 
-                ? `Tương đương ${Math.ceil((formData.totalLength || 30) / 6)} phân cảnh (6s/phân cảnh)`
-                : `Equivalent to ${Math.ceil((formData.totalLength || 30) / 6)} segments (6s/segment)`}
+                ? `Tương đương ${Math.ceil((formData.totalLength || 32) / 8)} phân cảnh (8s/phân cảnh)`
+                : `Equivalent to ${Math.ceil((formData.totalLength || 32) / 8)} segments (8s/segment)`}
             </p>
           </div>
 
@@ -219,26 +218,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
                     r === '9:16' ? 'w-3 h-5' : r === '1:1' ? 'w-4 h-4' : 'w-5 h-3'
                   } ${formData.ratio === r ? 'border-white' : 'border-zinc-400'}`} />
                   {r}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3 md:col-span-2">
-            <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{t('videoType')} *</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {(['review', 'cinematic', 'vlog', 'unboxing', 'tutorial'] as const).map((vt) => (
-                <button
-                  key={vt}
-                  type="button"
-                  onClick={() => updateFormData({ videoType: vt })}
-                  className={`py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center text-center px-2 ${
-                    formData.videoType === vt
-                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-600 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400 hover:border-indigo-300'
-                  }`}
-                >
-                  {t(`videoType${vt.charAt(0).toUpperCase() + vt.slice(1)}` as any)}
                 </button>
               ))}
             </div>
