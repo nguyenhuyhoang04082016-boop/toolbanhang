@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ProductInfo, AdSegment, Language, AdScript } from "../types";
 import { trackUsage, calculateCost } from "./costService";
 
@@ -961,6 +961,45 @@ export async function generateAffiliateIdeas(info: any, language: string): Promi
   } catch (e) {
     console.error("Failed to parse affiliate ideas JSON:", e);
     return [];
+  }
+}
+
+
+/**
+ * Generates a voiceover for the given text using Gemini TTS.
+ */
+export async function generateVoiceover(text: string, language: string = 'vi'): Promise<string> {
+  const apiKey = getApiKey('gemini');
+  if (!apiKey) throw new Error("API key not found");
+  
+  const ai = new GoogleGenAI({ apiKey });
+  const model = "gemini-2.5-flash-preview-tts";
+  
+  const prompt = language === 'vi' 
+    ? `Đọc đoạn văn bản sau một cách truyền cảm, chuyên nghiệp: "${text}"`
+    : `Read the following text in an inspiring, professional voice: "${text}"`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) throw new Error("Failed to generate voiceover");
+
+    return `data:audio/wav;base64,${base64Audio}`;
+  } catch (error) {
+    console.error("Error generating voiceover:", error);
+    throw error;
   }
 }
 

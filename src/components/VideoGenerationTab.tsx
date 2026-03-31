@@ -1,28 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { AdSegment, Language, AdScript } from '../types';
-import { Video, Play, Trash2, Plus, ArrowRight, Sparkles, Image as ImageIcon, Edit3, Save, X, Download, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Video, Play, Trash2, Plus, ArrowRight, Sparkles, Image as ImageIcon, Edit3, Save, X, Download, Loader2, AlertCircle, RefreshCw, Music, Mic, Volume2, CheckCircle2, Share2 } from 'lucide-react';
 import { useTranslation } from '../i18n';
 import { motion, AnimatePresence } from 'motion/react';
-import { generateVideo } from '../services/geminiService';
+import { generateVideo, generateVoiceover } from '../services/geminiService';
+import { mergeSceneVideos } from '../services/videoService';
+
+const MUSIC_OPTIONS = [
+  { id: 'upbeat', name: 'Upbeat & Energetic', url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=upbeat-corporate-11270.mp3' },
+  { id: 'calm', name: 'Calm & Professional', url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a7315b.mp3?filename=calm-commercial-11036.mp3' },
+  { id: 'modern', name: 'Modern Tech', url: 'https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c5825.mp3?filename=modern-technology-11356.mp3' },
+];
 
 interface VideoGenerationTabProps {
   script: AdScript | null;
   onUpdateSegments: (segments: AdSegment[]) => void;
   onOpenApiKeySettings?: () => void;
   language: Language;
+  initialMergedVideoUrl?: string | null;
 }
 
 export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
   script,
   onUpdateSegments,
   onOpenApiKeySettings,
-  language
+  language,
+  initialMergedVideoUrl = null
 }) => {
   const { t } = useTranslation(language);
   const [videoSegments, setVideoSegments] = useState<AdSegment[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  
+  // Merge & Export states
+  const [addVoiceover, setAddVoiceover] = useState(true);
+  const [addMusic, setAddMusic] = useState(true);
+  const [selectedMusicUrl, setSelectedMusicUrl] = useState(MUSIC_OPTIONS[0].url);
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState(0);
+  const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(initialMergedVideoUrl);
+
+  useEffect(() => {
+    if (initialMergedVideoUrl) {
+      setMergedVideoUrl(initialMergedVideoUrl);
+    }
+  }, [initialMergedVideoUrl]);
+  const [isGeneratingVoiceover, setIsGeneratingVoiceover] = useState(false);
 
   useEffect(() => {
     if (script && videoSegments.length === 0) {
@@ -97,6 +121,44 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
         alert(t('errorGeneratingVideo') + ": " + msg);
       }
       handleUpdateSegment(segment.id, { isGeneratingVideo: false });
+    }
+  };
+
+  const handleMergeAndExport = async () => {
+    const segmentsWithVideo = videoSegments.filter(s => s.videoUrl);
+    if (segmentsWithVideo.length === 0) {
+      alert(language === 'vi' ? 'Vui lòng tạo ít nhất một video trước khi xuất.' : 'Please generate at least one video before exporting.');
+      return;
+    }
+
+    setIsMerging(true);
+    setMergeProgress(0);
+    setMergedVideoUrl(null);
+
+    try {
+      let voiceUrl: string | undefined = undefined;
+      if (addVoiceover) {
+        setIsGeneratingVoiceover(true);
+        const fullScript = videoSegments.map(s => s.voiceover).filter(Boolean).join(' ');
+        if (fullScript) {
+          voiceUrl = await generateVoiceover(fullScript, language);
+        }
+        setIsGeneratingVoiceover(false);
+      }
+
+      const finalUrl = await mergeSceneVideos(videoSegments, {
+        voiceUrl,
+        musicUrl: addMusic ? selectedMusicUrl : undefined,
+        onProgress: (p) => setMergeProgress(Math.round(p * 100))
+      });
+
+      setMergedVideoUrl(finalUrl);
+    } catch (error: any) {
+      console.error('Error merging videos:', error);
+      alert((language === 'vi' ? 'Lỗi khi xuất video: ' : 'Error exporting video: ') + error.message);
+    } finally {
+      setIsMerging(false);
+      setIsGeneratingVoiceover(false);
     }
   };
 
@@ -358,18 +420,111 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
       </AnimatePresence>
 
       {/* Fixed Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 flex justify-center z-50">
-        <button
-          onClick={() => {
-            // For now, just show a success message or go back to start
-            alert(language === 'vi' ? 'Chúc mừng! Bạn đã hoàn thành quy trình tạo video.' : 'Congratulations! You have completed the video creation process.');
-            window.location.reload(); // Simple way to reset for now, or we could just go to 'form'
-          }}
-          className="px-12 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-xl shadow-emerald-500/20 flex items-center gap-3 transition-all transform hover:scale-105 active:scale-95"
-        >
-          {language === 'vi' ? 'Hoàn tất' : 'Finish'}
-          <Check className="w-5 h-5" />
-        </button>
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 z-50">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          {/* Export Options */}
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setAddVoiceover(!addVoiceover)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+                  addVoiceover 
+                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400' 
+                    : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                }`}
+              >
+                <Mic className="w-4 h-4" />
+                <span className="text-sm font-medium">{language === 'vi' ? 'Thuyết minh' : 'Voiceover'}</span>
+                <div className={`w-8 h-4 rounded-full relative transition-colors ${addVoiceover ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${addVoiceover ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </button>
+
+              <button
+                onClick={() => setAddMusic(!addMusic)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+                  addMusic 
+                    ? 'bg-blue-500/10 border-blue-500/50 text-blue-600 dark:text-blue-400' 
+                    : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                }`}
+              >
+                <Music className="w-4 h-4" />
+                <span className="text-sm font-medium">{language === 'vi' ? 'Nhạc nền' : 'Music'}</span>
+                <div className={`w-8 h-4 rounded-full relative transition-colors ${addMusic ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${addMusic ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </button>
+            </div>
+
+            {addMusic && (
+              <select
+                value={selectedMusicUrl}
+                onChange={(e) => setSelectedMusicUrl(e.target.value)}
+                className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                {MUSIC_OPTIONS.map(opt => (
+                  <option key={opt.id} value={opt.url}>{opt.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4">
+            {mergedVideoUrl && (
+              <a
+                href={mergedVideoUrl}
+                download="final_ad_video.mp4"
+                className="flex items-center gap-2 px-6 py-3 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-2xl font-bold transition-all border border-zinc-200 dark:border-zinc-800"
+              >
+                <Download className="w-5 h-5" />
+                {language === 'vi' ? 'Tải xuống' : 'Download'}
+              </a>
+            )}
+
+            <button
+              onClick={handleMergeAndExport}
+              disabled={isMerging || videoSegments.filter(s => s.videoUrl).length === 0}
+              className={`px-10 py-4 rounded-2xl font-bold shadow-xl flex items-center gap-3 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed ${
+                mergedVideoUrl 
+                  ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+              }`}
+            >
+              {isMerging ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>
+                    {isGeneratingVoiceover 
+                      ? (language === 'vi' ? 'Đang tạo thuyết minh...' : 'Generating voiceover...') 
+                      : (language === 'vi' ? `Đang xuất ${mergeProgress}%` : `Exporting ${mergeProgress}%`)}
+                  </span>
+                </>
+              ) : mergedVideoUrl ? (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  <span>{language === 'vi' ? 'Xuất lại' : 'Re-export'}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  <span>{language === 'vi' ? 'Ghép & Xuất Video' : 'Merge & Export'}</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                if (confirm(language === 'vi' ? 'Bạn có chắc chắn muốn hoàn tất? Video đã xuất sẽ không được lưu.' : 'Are you sure you want to finish? Exported video will not be saved.')) {
+                  window.location.reload();
+                }
+              }}
+              className="p-4 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              title={language === 'vi' ? 'Hoàn tất' : 'Finish'}
+            >
+              <CheckCircle2 className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

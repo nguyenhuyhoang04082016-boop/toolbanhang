@@ -315,6 +315,14 @@ export const translations = {
     copy: "Copy",
     copied: "Copied!",
     noData: "No data available.",
+    autoGenerateVideo: "Auto Generate Video",
+    autoGeneratingVideo: "Auto Generating Video",
+    pleaseDoNotCloseBrowser: "Please do not close the browser",
+    automationDesc: "The system is processing complex steps including script generation, AI image drawing, video rendering, and voiceover.",
+    scriptAndPrompts: "Script & Prompts",
+    generatingImages: "Generating Images",
+    generatingVideos: "Generating Videos",
+    mergingVideo: "Merging Video",
   },
   vi: {
     // Tabs
@@ -630,6 +638,14 @@ export const translations = {
     copy: "Sao chép",
     copied: "Đã sao chép!",
     noData: "Không có dữ liệu.",
+    autoGenerateVideo: "Tự động tạo Video",
+    autoGeneratingVideo: "Đang tự động tạo Video",
+    pleaseDoNotCloseBrowser: "Vui lòng không đóng trình duyệt",
+    automationDesc: "Hệ thống đang xử lý nhiều bước phức tạp bao gồm tạo kịch bản, vẽ hình ảnh AI, dựng video và lồng tiếng.",
+    scriptAndPrompts: "Kịch bản & Prompts",
+    generatingImages: "Đang tạo hình ảnh",
+    generatingVideos: "Đang tạo video",
+    mergingVideo: "Đang tổng hợp video",
   }
 };
 
