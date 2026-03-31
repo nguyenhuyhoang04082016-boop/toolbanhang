@@ -8,7 +8,9 @@ interface ScriptOrientationTabProps {
   product: ProductInfo;
   onUpdate: (updates: Partial<ProductInfo>) => void;
   onGenerate: () => void;
+  onInfer?: () => Promise<void>;
   isLoading: boolean;
+  isInferring?: boolean;
   language: Language;
 }
 
@@ -16,7 +18,9 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
   product,
   onUpdate,
   onGenerate,
+  onInfer,
   isLoading,
+  isInferring = false,
   language
 }) => {
   const { t } = useTranslation(language);
@@ -28,6 +32,13 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
     keyMessage: '',
     toneOfVoice: 'friendly'
   };
+
+  // Auto-infer if fields are empty
+  React.useEffect(() => {
+    if (onInfer && !orientation.targetAudience && !orientation.keyMessage && product.name) {
+      onInfer();
+    }
+  }, []);
 
   const updateOrientation = (updates: Partial<ScriptOrientation>) => {
     onUpdate({
@@ -155,9 +166,25 @@ export const ScriptOrientationTab: React.FC<ScriptOrientationTabProps> = ({
 
         <div className="space-y-8">
           <section className="space-y-4">
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-              {language === 'vi' ? 'Nội dung bổ sung' : 'Additional Content'}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                {language === 'vi' ? 'Nội dung bổ sung' : 'Additional Content'}
+              </h3>
+              {onInfer && (
+                <button
+                  onClick={onInfer}
+                  disabled={isInferring}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 hover:text-indigo-500 transition-colors disabled:opacity-50"
+                >
+                  {isInferring ? (
+                    <div className="w-3 h-3 border-2 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3 h-3" />
+                  )}
+                  {language === 'vi' ? 'Gợi ý bằng AI' : 'Suggest with AI'}
+                </button>
+              )}
+            </div>
             
             <div className="space-y-4">
               <div className="space-y-2">

@@ -4,8 +4,9 @@ import { trackUsage, calculateCost } from "./costService";
 
 const DEFAULT_MODEL = "gemini-3-flash-preview";
 
-const getApiKey = (type: 'gemini' | 'veo' = 'gemini') => {
+const getApiKey = (type: 'gemini' | 'veo' | 'image' = 'gemini') => {
   const manualGeminiKey = typeof window !== 'undefined' ? localStorage.getItem('manual_gemini_api_key') : null;
+  const manualImageKey = typeof window !== 'undefined' ? localStorage.getItem('manual_image_api_key') : null;
   const manualVeoKey = typeof window !== 'undefined' ? localStorage.getItem('manual_veo_api_key') : null;
   
   // Priority: 
@@ -13,14 +14,15 @@ const getApiKey = (type: 'gemini' | 'veo' = 'gemini') => {
   // 2. Platform selected key (selected via "Chọn API Key từ Project")
   
   if (type === 'veo') {
-    // Veo 3 requires a paid key. We prioritize the manual key if provided, 
-    // otherwise we use the platform-injected key which is updated when the user selects a key in the dialog.
     return manualVeoKey || process.env.API_KEY || "";
+  }
+  if (type === 'image') {
+    return manualImageKey || manualGeminiKey || process.env.API_KEY || "";
   }
   return manualGeminiKey || process.env.API_KEY || "";
 };
 
-const getAiInstance = (type: 'gemini' | 'veo' = 'gemini') => {
+const getAiInstance = (type: 'gemini' | 'veo' | 'image' = 'gemini') => {
   return new GoogleGenAI({ apiKey: getApiKey(type) });
 };
 
@@ -90,7 +92,7 @@ function extractTextFromResponse(response: any): string {
  */
 async function callGeminiWithRetry(
   params: any,
-  type: 'gemini' | 'veo' = 'gemini',
+  type: 'gemini' | 'veo' | 'image' = 'gemini',
   maxRetries = 3,
   baseDelay = 3000
 ): Promise<any> {
@@ -178,6 +180,15 @@ async function callGeminiWithRetry(
         const isServerError = statusCode >= 500 || errorMessage.includes("500") || errorMessage.includes("503");
         
         if (!isRateLimit && !isServerError) {
+          // Special handling for 403/Permission Denied
+          if (statusCode === 403 || errorMessage.includes("403") || errorMessage.toLowerCase().includes("permission")) {
+            throw new Error(
+              "Lỗi quyền truy cập (403 Permission Denied). Vui lòng kiểm tra: " +
+              "1. API Key có thuộc Project đã bật Thanh toán (Paid) không. " +
+              "2. Generative AI API đã được bật trong Google Cloud Console chưa. " +
+              "3. Model này có được hỗ trợ trong vùng của bạn không."
+            );
+          }
           throw error;
         }
         
@@ -211,10 +222,10 @@ export async function inferScriptOrientation(product: ProductInfo, language: Lan
   Additional Requirements: ${product.additionalRequirements || 'None'}
   
   Return a JSON object with:
-  - "style": One of ['lifestyle', 'cinematic', 'vlog', 'unboxing', 'tutorial', 'storytelling', 'comedy', 'educational']
+  - "style": One of ['review', 'cinematic', 'storytelling', 'vlog', 'unboxing', 'tutorial']
   - "dialogueType": One of ['self-talk', 'no-read', 'none']
-  - "targetAudience": A short description of the ideal customer
-  - "keyMessage": The most important point to convey
+  - "targetAudience": A short description of the ideal customer (in ${language === 'vi' ? 'Vietnamese' : 'English'})
+  - "keyMessage": The most important point to convey (in ${language === 'vi' ? 'Vietnamese' : 'English'})
   - "toneOfVoice": One of ['energetic', 'professional', 'friendly', 'luxury', 'funny', 'emotional']
   
   Choose the style that best fits the product's nature and the dialogue type that would be most engaging.
@@ -240,11 +251,11 @@ export async function inferScriptOrientation(product: ProductInfo, language: Lan
       }
     });
 
-    return JSON.parse(extractTextFromResponse(response) || '{"style": "lifestyle", "dialogueType": "self-talk", "targetAudience": "General", "keyMessage": "N/A", "toneOfVoice": "friendly"}');
+    return JSON.parse(extractTextFromResponse(response) || '{"style": "review", "dialogueType": "self-talk", "targetAudience": "General", "keyMessage": "N/A", "toneOfVoice": "friendly"}');
   } catch (error) {
     console.warn("Failed to infer orientation, using defaults", error);
     return { 
-      style: 'lifestyle', 
+      style: 'review', 
       dialogueType: 'self-talk',
       targetAudience: 'General',
       keyMessage: 'N/A',
@@ -581,7 +592,8 @@ export async function generateImagePrompts(
 export async function generateImage(
   prompt: string, 
   aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9",
-  base64Images?: string[]
+  base64Images?: string[],
+  referenceImageUrl?: string
 ): Promise<string> {
   // Check for Mock Mode
   const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
@@ -592,11 +604,109 @@ export async function generateImage(
     return `https://picsum.photos/seed/${seed}/${width}/${height}`;
   }
 
-  const apiKey = getApiKey('gemini');
+  const apiKey = getApiKey('image');
   if (!apiKey) {
-    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng vào phần Cài đặt để nhập Key.");
+    throw new Error("Chưa cấu hình API Key cho tạo ảnh. Vui lòng vào phần Cài đặt để nhập Key.");
   }
 
+  const parts: any[] = [{ text: prompt }];
+  
+  // Add reference images (product images, etc.)
+  if (base64Images && base64Images.length > 0) {
+    const imageParts = base64Images.map(img => {
+      const [header, data] = img.split(',');
+      const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
+      return {
+        inlineData: {
+          mimeType,
+          data
+        }
+      };
+    });
+    parts.unshift(...imageParts);
+  }
+
+  // Add reference image for character consistency (start image)
+  if (referenceImageUrl && referenceImageUrl.startsWith('data:')) {
+    const [header, data] = referenceImageUrl.split(',');
+    const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
+    parts.push({
+      inlineData: {
+        mimeType,
+        data
+      }
+    });
+    // Update prompt to emphasize consistency
+    parts[parts.length - 2].text += ". Maintain the exact same character, environment, and style as the provided reference image.";
+  }
+
+  const language = (typeof window !== 'undefined' ? localStorage.getItem('app_language') || 'vi' : 'vi') as Language;
+
+  try {
+    const response = await callGeminiWithRetry({
+      model: 'gemini-3.1-flash-image-preview',
+      contents: {
+        parts,
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: "1K"
+        },
+      },
+    }, 'image');
+
+    const candidate = response.candidates?.[0];
+    
+    if (candidate?.finishReason === 'SAFETY') {
+      throw new Error(language === 'vi' ? "Nội dung bị chặn bởi bộ lọc an toàn." : "Content blocked by safety filters.");
+    }
+
+    // Check for non-text parts (inlineData) which might contain the image
+    const responseParts = candidate?.content?.parts || [];
+    for (const part of responseParts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+
+    // Handle permission errors or text-only responses that indicate failure
+    const responseText = extractTextFromResponse(response);
+    if (responseText.toLowerCase().includes("not allowed") || 
+        responseText.toLowerCase().includes("permission denied") ||
+        responseText.toLowerCase().includes("billing") ||
+        responseText.toLowerCase().includes("paid account")) {
+      // Try fallback to 2.5-flash-image
+      console.warn("Permission denied for 3.1-flash-image-preview, trying fallback to 2.5-flash-image...");
+      return await generateImageFallback(prompt, aspectRatio, base64Images, language);
+    }
+    
+    throw new Error(language === 'vi' ? "Không thể tạo ảnh. Có thể do giới hạn tài khoản hoặc nội dung không hợp lệ." : "Could not generate image. This might be due to account limits or invalid content.");
+  } catch (error: any) {
+    const msg = error?.message || "";
+    if (msg.includes("403") || msg.includes("permission")) {
+      // Try fallback to 2.5-flash-image
+      console.warn("Permission denied for 3.1-flash-image-preview, trying fallback to 2.5-flash-image...");
+      return await generateImageFallback(prompt, aspectRatio, base64Images, language);
+    }
+    if (msg.includes("quota") || msg.includes("limit")) {
+      throw new Error(language === 'vi' 
+        ? "Hết hạn mức (Quota Exceeded). Vui lòng kiểm tra giới hạn của tài khoản."
+        : "Quota Exceeded. Please check your account limits.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fallback image generation using gemini-2.5-flash-image
+ */
+async function generateImageFallback(
+  prompt: string, 
+  aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9",
+  base64Images?: string[],
+  language: Language = 'vi'
+): Promise<string> {
   const parts: any[] = [{ text: prompt }];
   
   if (base64Images && base64Images.length > 0) {
@@ -615,25 +725,18 @@ export async function generateImage(
 
   try {
     const response = await callGeminiWithRetry({
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-2.5-flash-image',
       contents: {
         parts,
       },
       config: {
         imageConfig: {
           aspectRatio: aspectRatio,
-          imageSize: "1K"
         },
       },
-    });
+    }, 'image');
 
     const candidate = response.candidates?.[0];
-    
-    if (candidate?.finishReason === 'SAFETY') {
-      throw new Error("Nội dung bị chặn bởi bộ lọc an toàn.");
-    }
-
-    // Check for non-text parts (inlineData) which might contain the image
     const responseParts = candidate?.content?.parts || [];
     for (const part of responseParts) {
       if (part.inlineData) {
@@ -641,22 +744,12 @@ export async function generateImage(
       }
     }
 
-    // Handle permission errors or text-only responses that indicate failure
-    const responseText = extractTextFromResponse(response);
-    if (responseText.toLowerCase().includes("not allowed") || 
-        responseText.toLowerCase().includes("permission denied") ||
-        responseText.toLowerCase().includes("billing") ||
-        responseText.toLowerCase().includes("paid account")) {
-      throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Vui lòng sử dụng API Key từ một Project có bật thanh toán (Paid).");
-    }
-    
-    throw new Error("Không thể tạo ảnh từ câu lệnh này. Có thể do giới hạn của tài khoản miễn phí hoặc nội dung yêu cầu không hợp lệ.");
+    throw new Error("Fallback failed to generate image.");
   } catch (error: any) {
-    const msg = error?.message || "";
-    if (msg.includes("403") || msg.includes("permission") || msg.includes("quota") || msg.includes("limit")) {
-      throw new Error("Tài khoản Gemini Miễn phí không hỗ trợ tạo ảnh qua API. Vui lòng sử dụng API Key từ một Project có bật thanh toán (Paid).");
-    }
-    throw error;
+    console.error("Fallback image generation failed:", error);
+    throw new Error(language === 'vi' 
+      ? "Lỗi quyền truy cập (Permission Denied). Vui lòng kiểm tra: 1. API Key có thuộc Project đã bật Thanh toán (Paid) không. 2. Generative AI API đã được bật trong Google Cloud Console chưa."
+      : "Permission Denied. Please check: 1. Is your API Key from a Paid project? 2. Is the Generative AI API enabled in your Google Cloud Console?");
   }
 }
 
@@ -965,44 +1058,6 @@ export async function generateAffiliateIdeas(info: any, language: string): Promi
   }
 }
 
-
-/**
- * Generates a voiceover for the given text using Gemini TTS.
- */
-export async function generateVoiceover(text: string, language: string = 'vi'): Promise<string> {
-  const apiKey = getApiKey('gemini');
-  if (!apiKey) throw new Error("API key not found");
-  
-  const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-2.5-flash-preview-tts";
-  
-  const prompt = language === 'vi' 
-    ? `Đọc đoạn văn bản sau một cách truyền cảm, chuyên nghiệp: "${text}"`
-    : `Read the following text in an inspiring, professional voice: "${text}"`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("Failed to generate voiceover");
-
-    return `data:audio/wav;base64,${base64Audio}`;
-  } catch (error) {
-    console.error("Error generating voiceover:", error);
-    throw error;
-  }
-}
 
 export async function generateMotionPrompt(
   currentScene: any,

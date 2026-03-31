@@ -12,6 +12,7 @@ interface ApiKeyGuardProps {
 export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => void; language: Language }> = ({ onSave, onCancel, language }) => {
   const { t } = useTranslation(language);
   const [geminiKey, setGeminiKey] = useState<string>(localStorage.getItem('manual_gemini_api_key') || '');
+  const [imageKey, setImageKey] = useState<string>(localStorage.getItem('manual_image_api_key') || '');
   const [veoKey, setVeoKey] = useState<string>(localStorage.getItem('manual_veo_api_key') || '');
   const [geminiModel, setGeminiModel] = useState<string>(localStorage.getItem('selected_gemini_model') || 'gemini-2.5-flash');
   const [veoModel, setVeoModel] = useState<string>(localStorage.getItem('selected_veo_model') || 'veo-3.1-fast-generate-preview');
@@ -20,6 +21,8 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
   const handleSelectKey = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
+      // Assume success to avoid race condition with hasSelectedApiKey
+      localStorage.setItem('selected_key_triggered', 'true');
       onSave();
     }
   };
@@ -27,6 +30,9 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
   const handleSaveKeys = () => {
     if (geminiKey.trim()) {
       localStorage.setItem('manual_gemini_api_key', geminiKey.trim());
+    }
+    if (imageKey.trim()) {
+      localStorage.setItem('manual_image_api_key', imageKey.trim());
     }
     if (veoKey.trim()) {
       localStorage.setItem('manual_veo_api_key', veoKey.trim());
@@ -39,11 +45,13 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
 
   const handleClearKeys = () => {
     localStorage.removeItem('manual_gemini_api_key');
+    localStorage.removeItem('manual_image_api_key');
     localStorage.removeItem('manual_veo_api_key');
     localStorage.removeItem('selected_gemini_model');
     localStorage.removeItem('selected_veo_model');
     localStorage.removeItem('mock_mode');
     setGeminiKey('');
+    setImageKey('');
     setVeoKey('');
     setGeminiModel('gemini-2.5-flash');
     setVeoModel('veo-3.1-fast-generate-preview');
@@ -101,14 +109,19 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
         <div className="grid grid-cols-1 gap-4 text-left">
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">{t('geminiApiKeyLabel')}</label>
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
+                {language === 'vi' ? 'API Key Tạo Kịch Bản (Gemini)' : 'Text Generation API Key (Gemini)'}
+              </label>
               <input
                 type="password"
                 value={geminiKey}
                 onChange={(e) => setGeminiKey(e.target.value)}
-                placeholder={t('geminiApiKeyPlaceholder')}
+                placeholder={language === 'vi' ? 'Nhập API Key cho tạo kịch bản...' : 'Enter API Key for text generation...'}
                 className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
+              <p className="text-[10px] text-amber-600 font-medium px-1">
+                {t('apiPermissionTip')}
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -125,12 +138,27 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">{t('veoApiKeyLabel')}</label>
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
+                {language === 'vi' ? 'API Key Tạo Ảnh (Gemini)' : 'Image Generation API Key (Gemini)'}
+              </label>
+              <input
+                type="password"
+                value={imageKey}
+                onChange={(e) => setImageKey(e.target.value)}
+                placeholder={language === 'vi' ? 'Nhập API Key cho tạo ảnh...' : 'Enter API Key for image generation...'}
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
+                {language === 'vi' ? 'API Key Tạo Video (Veo 3)' : 'Video Generation API Key (Veo 3)'}
+              </label>
               <input
                 type="password"
                 value={veoKey}
                 onChange={(e) => setVeoKey(e.target.value)}
-                placeholder={t('veoApiKeyPlaceholder')}
+                placeholder={language === 'vi' ? 'Nhập API Key cho tạo video...' : 'Enter API Key for video generation...'}
                 className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
@@ -150,12 +178,12 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
             <div className="flex gap-2 pt-2">
               <button
                 onClick={handleSaveKeys}
-                disabled={!geminiKey.trim() && !veoKey.trim()}
+                disabled={!geminiKey.trim() && !imageKey.trim() && !veoKey.trim()}
                 className="flex-1 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:opacity-90 disabled:opacity-50 rounded-xl font-bold text-sm transition-all"
               >
                 {t('saveApiConfig')}
               </button>
-              {(localStorage.getItem('manual_gemini_api_key') || localStorage.getItem('manual_veo_api_key')) && (
+              {(localStorage.getItem('manual_gemini_api_key') || localStorage.getItem('manual_image_api_key') || localStorage.getItem('manual_veo_api_key')) && (
                 <button
                   onClick={handleClearKeys}
                   className="px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-bold text-sm transition-all"
@@ -232,6 +260,7 @@ export const ApiKeyGuard: React.FC<ApiKeyGuardProps> = ({ children, language }) 
     const geminiKey = localStorage.getItem('manual_gemini_api_key');
     const veoKey = localStorage.getItem('manual_veo_api_key');
     const isMockMode = localStorage.getItem('mock_mode') === 'true';
+    const isTriggered = localStorage.getItem('selected_key_triggered') === 'true';
     
     // If Mock Mode is enabled, we allow access
     if (isMockMode) {
@@ -239,8 +268,8 @@ export const ApiKeyGuard: React.FC<ApiKeyGuardProps> = ({ children, language }) 
       return;
     }
 
-    // If both manual keys are set, we are good
-    if (geminiKey && veoKey) {
+    // If both manual keys are set, or if we just triggered a key selection, we are good
+    if ((geminiKey && veoKey) || isTriggered) {
       setHasApiKey(true);
       return;
     }

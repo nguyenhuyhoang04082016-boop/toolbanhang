@@ -11,7 +11,6 @@ interface ProductAssetsTabProps {
   onDeleteTemplate: (id: string) => void;
   onUseTemplate: (template: VisualTemplate) => void;
   onNext: () => void;
-  onFullAuto: () => void;
   isLoading: boolean;
   language: Language;
 }
@@ -23,7 +22,6 @@ export const ProductAssetsTab: React.FC<ProductAssetsTabProps> = ({
   onDeleteTemplate, 
   onUseTemplate, 
   onNext, 
-  onFullAuto,
   isLoading, 
   language 
 }) => {
@@ -290,29 +288,17 @@ export const ProductAssetsTab: React.FC<ProductAssetsTabProps> = ({
       </AnimatePresence>
 
       <div className="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-zinc-950/90 backdrop-blur-lg border-t border-zinc-200 dark:border-zinc-800 p-4 z-40">
-        <div className="max-w-3xl mx-auto flex gap-4">
+        <div className="max-w-3xl mx-auto">
           <button
             onClick={onNext}
             disabled={isLoading}
-            className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-2xl transition-all flex items-center justify-center gap-4 ${
-              isLoading 
-                ? 'bg-zinc-400 cursor-not-allowed' 
-                : 'bg-zinc-600 hover:bg-zinc-500 active:scale-[0.98]'
-            }`}
-          >
-            <span className="text-lg uppercase tracking-tight">{t('next') || 'Tiếp theo'}</span>
-          </button>
-          <button
-            onClick={onFullAuto}
-            disabled={isLoading}
-            className={`flex-[2] py-4 rounded-2xl font-bold text-white shadow-2xl transition-all flex items-center justify-center gap-4 ${
+            className={`w-full py-4 rounded-2xl font-bold text-white shadow-2xl transition-all flex items-center justify-center gap-4 ${
               isLoading 
                 ? 'bg-zinc-400 cursor-not-allowed' 
                 : 'bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-indigo-200 dark:shadow-none'
             }`}
           >
-            <Sparkles className="w-6 h-6" />
-            <span className="text-lg uppercase tracking-tight">{language === 'vi' ? 'Tự động tạo video' : 'Auto Generate Video'}</span>
+            <span className="text-lg uppercase tracking-tight">{t('next') || 'Tiếp theo'}</span>
           </button>
         </div>
       </div>

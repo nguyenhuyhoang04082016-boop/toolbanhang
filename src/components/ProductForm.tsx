@@ -44,11 +44,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({ onSubmit, onSaveTempla
       const newData = { ...prev, ...updates };
       // Update ref immediately to prevent loop if parent re-renders
       lastInitialValueRef.current = JSON.stringify(newData);
-      if (onChange) {
-        onChange(updates);
-      }
       return newData;
     });
+    
+    if (onChange) {
+      onChange(updates);
+    }
   };
 
   const validate = () => {

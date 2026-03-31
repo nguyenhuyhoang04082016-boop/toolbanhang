@@ -187,6 +187,7 @@ export const translations = {
     generating: "Generating...",
     regenerateImages: "Regenerate Images",
     generateImages: "Generate Images",
+    generateAllImages: "Generate All Images",
     generateVideo: "Generate Video",
     generatingVideo: "Generating Video...",
     videoReady: "Video is ready!",
@@ -196,6 +197,7 @@ export const translations = {
     veo3Prompt: "Veo 3 Prompt",
     startImage: "Start Image",
     endImage: "End Image",
+    apiPermissionTip: "Tip: If you get 'Permission Denied' with a paid key, ensure 'Generative AI API' is enabled in Google Cloud Console.",
 
     // Affiliate Channel Tab
     platformInfo: "Platform Information",
@@ -304,6 +306,7 @@ export const translations = {
     loading: "Loading...",
     generatingScript: "Generating script...",
     aiAnalyzing: "AI is analyzing product info to create the most effective ad script for you.",
+    aiAnalyzingProduct: "AI is analyzing product information to suggest the best orientation...",
     aiError: "AI Error",
     copiedToClipboard: "Copied to clipboard",
     error: "Error",
@@ -510,6 +513,7 @@ export const translations = {
     generating: "Đang tạo...",
     regenerateImages: "Tạo lại ảnh",
     generateImages: "Tạo ảnh",
+    generateAllImages: "Tạo toàn bộ ảnh",
     generateVideo: "Tạo Video",
     generatingVideo: "Đang tạo Video...",
     videoReady: "Video đã sẵn sàng!",
@@ -519,6 +523,7 @@ export const translations = {
     veo3Prompt: "Câu lệnh Veo 3",
     startImage: "Ảnh đầu",
     endImage: "Ảnh cuối",
+    apiPermissionTip: "Mẹo: Nếu gặp lỗi 'Permission Denied' với Key trả phí, hãy đảm bảo đã bật 'Generative AI API' trong Google Cloud Console.",
 
     // Affiliate Channel Tab
     platformInfo: "Thông tin nền tảng",
@@ -627,6 +632,7 @@ export const translations = {
     loading: "Đang tải...",
     generatingScript: "Đang soạn kịch bản...",
     aiAnalyzing: "AI đang phân tích thông tin sản phẩm để tạo kịch bản quảng cáo hiệu quả nhất cho bạn.",
+    aiAnalyzingProduct: "AI đang phân tích thông tin sản phẩm để gợi ý định hướng tốt nhất...",
     aiError: "Lỗi AI",
     copiedToClipboard: "Đã sao chép vào bộ nhớ tạm",
     error: "Lỗi",

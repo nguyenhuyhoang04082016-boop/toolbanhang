@@ -31,6 +31,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>({});
 
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   if (!script) {
     return (
@@ -84,11 +85,6 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
   const handleGenerateImages = async (segment: AdSegment) => {
     if (!segment.imagePrompt || !script) return;
     
-    onUpdateSegment(segment.id, { 
-      isGeneratingStart: true, 
-      isGeneratingEnd: true 
-    });
-
     try {
       const ratio = script?.productInfo?.ratio || '9:16';
       
@@ -101,15 +97,24 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
       // Limit to 20 images to avoid token limits or performance issues
       const limitedRefs = referenceImages.slice(0, 20);
       
-      const [startUrl, endUrl] = await Promise.all([
-        generateImage(segment.imagePrompt + ", start of the scene, high quality", ratio, limitedRefs),
-        generateImage(segment.imagePrompt + ", end of the scene, high quality", ratio, limitedRefs)
-      ]);
-
+      // Sequential generation: Start image first
+      onUpdateSegment(segment.id, { isGeneratingStart: true });
+      const startUrl = await generateImage(segment.imagePrompt + ", start of the scene, high quality", ratio, limitedRefs);
       onUpdateSegment(segment.id, { 
         startImageUrl: startUrl,
+        isGeneratingStart: false 
+      });
+
+      // Then End image
+      onUpdateSegment(segment.id, { isGeneratingEnd: true });
+      const endUrl = await generateImage(
+        segment.imagePrompt + ", end of the scene, high quality", 
+        ratio, 
+        limitedRefs,
+        startUrl // Pass start image for character consistency
+      );
+      onUpdateSegment(segment.id, { 
         endImageUrl: endUrl,
-        isGeneratingStart: false,
         isGeneratingEnd: false 
       });
     } catch (error: any) {
@@ -127,6 +132,23 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         isGeneratingEnd: false 
       });
     }
+  };
+
+  const handleGenerateAllImages = async () => {
+    if (!script || isGeneratingAll) return;
+    setIsGeneratingAll(true);
+    
+    for (const segment of script.segments) {
+      // Scroll to the segment being generated
+      const element = document.getElementById(`segment-${segment.id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      setSelectedSegmentId(segment.id);
+      await handleGenerateImages(segment);
+    }
+    
+    setIsGeneratingAll(false);
   };
 
   const handleImageUpload = (category: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,14 +375,30 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         </div>
       </div>
 
-      {/* Segment Selection Icons */}
+      {/* Segment Selection Icons & Generate All Button */}
       <div className="space-y-4">
-        <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-[0.2em] px-2">{t('segments')}</h3>
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-[0.2em]">{t('segments')}</h3>
+          <button
+            onClick={handleGenerateAllImages}
+            disabled={isGeneratingAll}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+          >
+            {isGeneratingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {t('generateAllImages')}
+          </button>
+        </div>
         <div className="flex flex-wrap gap-4 px-2">
           {script.segments.map((segment) => (
             <button
               key={segment.id}
-              onClick={() => setSelectedSegmentId(segment.id)}
+              onClick={() => {
+                setSelectedSegmentId(segment.id);
+                const element = document.getElementById(`segment-${segment.id}`);
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }}
               className={`relative w-16 h-16 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
                 selectedSegmentId === segment.id
                   ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none scale-110 z-10'
@@ -383,49 +421,60 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         </div>
       </div>
 
-      {/* Selected Segment Detail View */}
-      <AnimatePresence mode="wait">
-        {selectedSegment && (
+      {/* All Segments List View */}
+      <div className="space-y-12">
+        {script.segments.map((segment) => (
           <motion.div
-            key={selectedSegment.id}
+            key={segment.id}
+            id={`segment-${segment.id}`}
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl"
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            className={`bg-white dark:bg-zinc-950 rounded-3xl border transition-all duration-500 ${
+              selectedSegmentId === segment.id 
+                ? 'border-indigo-500 shadow-2xl shadow-indigo-500/10 scale-[1.02] z-10' 
+                : 'border-zinc-200 dark:border-zinc-800 shadow-xl'
+            } overflow-hidden`}
+            onClick={() => setSelectedSegmentId(segment.id)}
           >
             <div className="p-8 space-y-8">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
-                    <span className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center text-sm font-black">
-                      {selectedSegment.index}
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black transition-colors ${
+                      selectedSegmentId === segment.id ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500'
+                    }`}>
+                      {segment.index}
                     </span>
-                    {t('segment')} {selectedSegment.index}
+                    {t('segment')} {segment.index}
                   </h3>
                   <span className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                    {selectedSegment.startTime}s - {selectedSegment.endTime}s
+                    {segment.startTime}s - {segment.endTime}s
                   </span>
                 </div>
                 <div className="flex items-center gap-4">
                   <button
-                    onClick={() => handleGenerateImages(selectedSegment)}
-                    disabled={selectedSegment.isGeneratingStart || selectedSegment.isGeneratingEnd}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGenerateImages(segment);
+                    }}
+                    disabled={segment.isGeneratingStart || segment.isGeneratingEnd}
                     className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${
-                      (selectedSegment.startImageUrl && selectedSegment.endImageUrl)
+                      (segment.startImageUrl && segment.endImageUrl)
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100'
                         : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-500/20'
                     } disabled:opacity-50`}
                   >
-                    {selectedSegment.isGeneratingStart || selectedSegment.isGeneratingEnd ? (
+                    {segment.isGeneratingStart || segment.isGeneratingEnd ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (selectedSegment.startImageUrl && selectedSegment.endImageUrl) ? (
+                    ) : (segment.startImageUrl && segment.endImageUrl) ? (
                       <RefreshCw className="w-4 h-4" />
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    {selectedSegment.isGeneratingStart || selectedSegment.isGeneratingEnd 
+                    {segment.isGeneratingStart || segment.isGeneratingEnd 
                       ? t('generating') 
-                      : (selectedSegment.startImageUrl && selectedSegment.endImageUrl) 
+                      : (segment.startImageUrl && segment.endImageUrl) 
                         ? t('regenerateImages') 
                         : t('generateImages')}
                   </button>
@@ -440,8 +489,9 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                       {t('visualDirection')}
                     </label>
                     <textarea
-                      value={selectedSegment.visualDirection}
-                      onChange={(e) => onUpdateSegment(selectedSegment.id, { visualDirection: e.target.value })}
+                      value={segment.visualDirection}
+                      onChange={(e) => onUpdateSegment(segment.id, { visualDirection: e.target.value })}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 text-sm text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-40 resize-none transition-all"
                     />
                   </div>
@@ -454,23 +504,28 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                     <div className="space-y-4">
                       <div className="relative group">
                         <textarea
-                          value={viPrompts[selectedSegment.id] || ''}
-                          onChange={(e) => setViPrompts(prev => ({ ...prev, [selectedSegment.id]: e.target.value }))}
-                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleRefinePrompt(selectedSegment.id))}
+                          value={viPrompts[segment.id] || ''}
+                          onChange={(e) => setViPrompts(prev => ({ ...prev, [segment.id]: e.target.value }))}
+                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleRefinePrompt(segment.id))}
+                          onClick={(e) => e.stopPropagation()}
                           className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 pr-14 text-sm font-medium text-zinc-600 dark:text-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none shadow-sm"
                           placeholder={language === 'vi' ? "Chỉnh sửa bằng Tiếng Việt..." : "Refine with Vietnamese..."}
                         />
                         <button
-                          onClick={() => handleRefinePrompt(selectedSegment.id)}
-                          disabled={isTranslating[selectedSegment.id] || !viPrompts[selectedSegment.id]}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRefinePrompt(segment.id);
+                          }}
+                          disabled={isTranslating[segment.id] || !viPrompts[segment.id]}
                           className="absolute bottom-4 right-4 p-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl disabled:opacity-50 transition-all shadow-md"
                         >
-                          {isTranslating[selectedSegment.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                          {isTranslating[segment.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                         </button>
                       </div>
                       <textarea
-                        value={selectedSegment.imagePrompt || ''}
-                        onChange={(e) => onUpdateSegment(selectedSegment.id, { imagePrompt: e.target.value })}
+                        value={segment.imagePrompt || ''}
+                        onChange={(e) => onUpdateSegment(segment.id, { imagePrompt: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
                         className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 text-xs font-mono text-zinc-500 focus:ring-2 focus:ring-indigo-500 outline-none h-24 resize-none"
                         placeholder="English image prompt..."
                       />
@@ -484,15 +539,16 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                       {t('startImage')}
                     </label>
                     <div className="aspect-[9/16] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner">
-                      {selectedSegment.startImageUrl ? (
+                      {segment.startImageUrl ? (
                         <>
-                          <img src={selectedSegment.startImageUrl} alt="Start" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={segment.startImageUrl} alt="Start" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button 
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const a = document.createElement('a');
-                                a.href = selectedSegment.startImageUrl!;
-                                a.download = `segment-${selectedSegment.index}-start.png`;
+                                a.href = segment.startImageUrl!;
+                                a.download = `segment-${segment.index}-start.png`;
                                 a.click();
                               }}
                               className="p-3 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
@@ -501,7 +557,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                             </button>
                           </div>
                         </>
-                      ) : selectedSegment.isGeneratingStart ? (
+                      ) : segment.isGeneratingStart ? (
                         <div className="flex flex-col items-center gap-3">
                           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
                           <span className="text-[10px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
@@ -517,15 +573,16 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                       {t('endImage')}
                     </label>
                     <div className="aspect-[9/16] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner">
-                      {selectedSegment.endImageUrl ? (
+                      {segment.endImageUrl ? (
                         <>
-                          <img src={selectedSegment.endImageUrl} alt="End" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={segment.endImageUrl} alt="End" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button 
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const a = document.createElement('a');
-                                a.href = selectedSegment.endImageUrl!;
-                                a.download = `segment-${selectedSegment.index}-end.png`;
+                                a.href = segment.endImageUrl!;
+                                a.download = `segment-${segment.index}-end.png`;
                                 a.click();
                               }}
                               className="p-3 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
@@ -534,7 +591,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                             </button>
                           </div>
                         </>
-                      ) : selectedSegment.isGeneratingEnd ? (
+                      ) : segment.isGeneratingEnd ? (
                         <div className="flex flex-col items-center gap-3">
                           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
                           <span className="text-[10px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
@@ -548,8 +605,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
               </div>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        ))}
+      </div>
 
       {/* Fixed Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 flex justify-center z-50">
