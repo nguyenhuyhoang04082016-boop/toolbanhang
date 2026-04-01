@@ -96,15 +96,28 @@ async function callGeminiWithRetry(
   maxRetries = 3,
   baseDelay = 3000
 ): Promise<any> {
+  const apiKey = getApiKey(type);
+  const apiKeySource = apiKey === process.env.API_KEY ? 'Platform/Environment' : 'Manual/LocalStorage';
+  const modelName = params.model || DEFAULT_MODEL;
+
   // Create a cache key from params
   const cacheKey = JSON.stringify(params);
   if (cache.has(cacheKey)) {
-    console.log("Returning cached Gemini response");
+    console.log(`[Gemini] Returning cached response for ${modelName}`);
     return cache.get(cacheKey);
   }
 
   const ai = getAiInstance(type);
-  const modelName = params.model || DEFAULT_MODEL;
+
+  // Log request details for debugging
+  console.log(`[Gemini Request]`, {
+    type,
+    model: modelName,
+    apiKeySource,
+    prompt: typeof params.contents === 'string' ? params.contents : 'Complex content (see parts)',
+    parts: params.contents?.parts?.map((p: any) => p.text ? { text: p.text } : { mimeType: p.inlineData?.mimeType, dataSize: p.inlineData?.data?.length }),
+    config: params.config
+  });
 
   // Estimation phase
   let estimatedInputTokens = 0;
@@ -117,7 +130,7 @@ async function callGeminiWithRetry(
     });
     estimatedInputTokens = countResult.totalTokens || 0;
   } catch (e) {
-    console.warn("Failed to count tokens for estimation", e);
+    // Silent fail for estimation
   }
 
   // Notify UI about estimation (we'll use a custom event)
@@ -172,6 +185,17 @@ async function callGeminiWithRetry(
         return response;
       } catch (error: any) {
         lastError = error;
+        
+        // Detailed error logging as requested
+        console.error(`[Gemini API Error] Attempt ${attempt + 1}:`, {
+          message: error?.message,
+          status: error?.status,
+          statusText: error?.statusText,
+          responseBody: error?.response?.data || error?.response || 'No body',
+          model: modelName,
+          type
+        });
+
         const errorMessage = error?.message || "";
         const statusCode = error?.status || 0;
         
@@ -182,22 +206,29 @@ async function callGeminiWithRetry(
         if (!isRateLimit && !isServerError) {
           // Special handling for 403/Permission Denied
           if (statusCode === 403 || errorMessage.includes("403") || errorMessage.toLowerCase().includes("permission")) {
-            throw new Error(
-              "Lỗi quyền truy cập (403 Permission Denied). Vui lòng kiểm tra: " +
-              "1. API Key có thuộc Project đã bật Thanh toán (Paid) không. " +
-              "2. Generative AI API đã được bật trong Google Cloud Console chưa. " +
-              "3. Model này có được hỗ trợ trong vùng của bạn không."
-            );
+            const detailedMsg = type === 'image' 
+              ? "Project/API key hiện tại không có quyền tạo ảnh hoặc chưa bật billing."
+              : "Lỗi quyền truy cập (403 Permission Denied). Vui lòng kiểm tra API Key và Billing.";
+            throw new Error(detailedMsg);
+          }
+          
+          if (isRateLimit) {
+            throw new Error(type === 'image' ? "Đã vượt quota tạo ảnh." : "Đã vượt hạn mức yêu cầu (Quota Exceeded).");
+          }
+
+          throw error;
+        }
+        
+        if (attempt === maxRetries) {
+          if (isRateLimit) {
+            throw new Error(type === 'image' ? "Đã vượt quota tạo ảnh." : "Đã vượt hạn mức yêu cầu (Quota Exceeded).");
           }
           throw error;
         }
         
-        console.warn(`Gemini API error (Attempt ${attempt + 1}):`, errorMessage);
-        
         // If it's a rate limit, increase the delay significantly for the next attempt
         if (isRateLimit && attempt === 0) {
-           // Wait a bit longer on the first 429
-           await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
       }
     }
@@ -595,10 +626,14 @@ export async function generateImage(
   base64Images?: string[],
   referenceImageUrl?: string
 ): Promise<string> {
+  // Pre-flight check for empty prompt
+  if (!prompt || prompt.trim().length === 0) {
+    throw new Error("Prompt tạo ảnh không được để trống.");
+  }
+
   // Check for Mock Mode
   const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
   if (isMockMode) {
-    // Return a high-quality placeholder image from Picsum
     const seed = Math.random().toString(36).substring(7);
     const [width, height] = aspectRatio === '16:9' ? [1920, 1080] : aspectRatio === '9:16' ? [1080, 1920] : [1024, 1024];
     return `https://picsum.photos/seed/${seed}/${width}/${height}`;
@@ -641,7 +676,14 @@ export async function generateImage(
   }
 
   const language = (typeof window !== 'undefined' ? localStorage.getItem('app_language') || 'vi' : 'vi') as Language;
-  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_image_model') || 'gemini-3.1-flash-image-preview' : 'gemini-3.1-flash-image-preview';
+  let model = typeof window !== 'undefined' ? localStorage.getItem('selected_image_model') || 'gemini-3.1-flash-image-preview' : 'gemini-3.1-flash-image-preview';
+
+  // Ensure an image model is used
+  const isImageModel = model.includes('image') || model.includes('imagen');
+  if (!isImageModel) {
+    console.warn(`[ImageGen] Model ${model} might not be an image model. Forcing gemini-3.1-flash-image-preview.`);
+    model = 'gemini-3.1-flash-image-preview';
+  }
 
   try {
     const response = await callGeminiWithRetry({
@@ -671,13 +713,12 @@ export async function generateImage(
       }
     }
 
-    // Handle permission errors or text-only responses that indicate failure
+    // Handle text-only responses that indicate failure
     const responseText = extractTextFromResponse(response);
     if (responseText.toLowerCase().includes("not allowed") || 
         responseText.toLowerCase().includes("permission denied") ||
         responseText.toLowerCase().includes("billing") ||
         responseText.toLowerCase().includes("paid account")) {
-      // Try fallback to 2.5-flash-image
       console.warn("Permission denied for 3.1-flash-image-preview, trying fallback to 2.5-flash-image...");
       return await generateImageFallback(prompt, aspectRatio, base64Images, language);
     }
@@ -686,14 +727,11 @@ export async function generateImage(
   } catch (error: any) {
     const msg = error?.message || "";
     if (msg.includes("403") || msg.includes("permission")) {
-      // Try fallback to 2.5-flash-image
-      console.warn("Permission denied for 3.1-flash-image-preview, trying fallback to 2.5-flash-image...");
-      return await generateImageFallback(prompt, aspectRatio, base64Images, language);
-    }
-    if (msg.includes("quota") || msg.includes("limit")) {
-      throw new Error(language === 'vi' 
-        ? "Hết hạn mức (Quota Exceeded). Vui lòng kiểm tra giới hạn của tài khoản."
-        : "Quota Exceeded. Please check your account limits.");
+      // Try fallback to 2.5-flash-image if it wasn't already the model
+      if (model !== 'gemini-2.5-flash-image') {
+        console.warn("Permission denied for 3.1-flash-image-preview, trying fallback to 2.5-flash-image...");
+        return await generateImageFallback(prompt, aspectRatio, base64Images, language);
+      }
     }
     throw error;
   }
