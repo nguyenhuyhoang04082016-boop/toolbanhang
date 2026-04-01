@@ -32,6 +32,7 @@ export default function App() {
   const [brandVoice, setBrandVoice] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [isInferring, setIsInferring] = useState(false);
   const [currentScript, setCurrentScript] = useState<AdScript | null>(null);
   const [history, setHistory] = useState<AdScript[]>([]);
@@ -278,6 +279,7 @@ export default function App() {
 
   const handleGenerate = async (product: ProductInfo) => {
     setIsLoading(true);
+    setLoadingProgress(10);
     try {
       // Ensure orientation is set
       let finalProduct = { ...product };
@@ -293,12 +295,15 @@ export default function App() {
         };
         setProductDraft(finalProduct);
       }
+      setLoadingProgress(30);
 
       // 1. Generate Script
       const { segments, seamlessScript, productAnalysis } = await generateAdScript(finalProduct, language, brandVoice);
+      setLoadingProgress(60);
       
       // 2. Generate Character Profile for consistency
       const characterProfile = await generateCharacterProfile(product);
+      setLoadingProgress(70);
       
       const allImages = [
         ...(product.referenceImages || []),
@@ -307,9 +312,11 @@ export default function App() {
 
       // 3. Generate Image Prompts for each segment
       const imagePrompts = await generateImagePrompts(segments, characterProfile, product.name, allImages);
+      setLoadingProgress(85);
       
       // 3.5 Generate Video Prompts
       const videoPrompts = await generateVideoPrompts(segments, characterProfile, product.name, allImages);
+      setLoadingProgress(95);
       
       const segmentsWithPrompts = segments.map((s, i) => ({
         ...s,
@@ -330,7 +337,8 @@ export default function App() {
       
       setCurrentScript(newScript);
       setHistory((prev) => [newScript, ...prev].slice(0, 20));
-      setActiveTab('results'); // Switch to results tab to review prompts
+      setLoadingProgress(100);
+      setTimeout(() => setActiveTab('results'), 500);
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
@@ -591,13 +599,30 @@ export default function App() {
                       </motion.div>
                     </div>
                   </div>
-                  <div className="text-center space-y-2">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-                      {activeTab === 'form' ? t('aiAnalyzingProduct') : t('generatingScript')}
-                    </h3>
-                    <p className="text-sm text-zinc-500 max-w-xs">
-                      {t('aiAnalyzing')}
-                    </p>
+                  <div className="text-center space-y-4 w-full max-w-md">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                        {activeTab === 'form' ? t('aiAnalyzingProduct') : t('generatingScript')}
+                      </h3>
+                      <p className="text-sm text-zinc-500">
+                        {t('aiAnalyzing')}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                        <span>{t('processing')}</span>
+                        <span>{loadingProgress}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-indigo-600"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${loadingProgress}%` }}
+                          transition={{ duration: 0.5 }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               ) : (
