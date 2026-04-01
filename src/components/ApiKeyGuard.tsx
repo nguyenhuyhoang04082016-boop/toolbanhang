@@ -15,6 +15,7 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
   const [imageKey, setImageKey] = useState<string>(localStorage.getItem('manual_image_api_key') || '');
   const [veoKey, setVeoKey] = useState<string>(localStorage.getItem('manual_veo_api_key') || '');
   const [geminiModel, setGeminiModel] = useState<string>(localStorage.getItem('selected_gemini_model') || 'gemini-2.5-flash');
+  const [imageModel, setImageModel] = useState<string>(localStorage.getItem('selected_image_model') || 'gemini-3.1-flash-image-preview');
   const [veoModel, setVeoModel] = useState<string>(localStorage.getItem('selected_veo_model') || 'veo-3.1-fast-generate-preview');
   const [mockMode, setMockMode] = useState<boolean>(localStorage.getItem('mock_mode') === 'true');
 
@@ -38,6 +39,7 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
       localStorage.setItem('manual_veo_api_key', veoKey.trim());
     }
     localStorage.setItem('selected_gemini_model', geminiModel);
+    localStorage.setItem('selected_image_model', imageModel);
     localStorage.setItem('selected_veo_model', veoModel);
     localStorage.setItem('mock_mode', String(mockMode));
     onSave();
@@ -48,12 +50,14 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
     localStorage.removeItem('manual_image_api_key');
     localStorage.removeItem('manual_veo_api_key');
     localStorage.removeItem('selected_gemini_model');
+    localStorage.removeItem('selected_image_model');
     localStorage.removeItem('selected_veo_model');
     localStorage.removeItem('mock_mode');
     setGeminiKey('');
     setImageKey('');
     setVeoKey('');
     setGeminiModel('gemini-2.5-flash');
+    setImageModel('gemini-3.1-flash-image-preview');
     setVeoModel('veo-3.1-fast-generate-preview');
     setMockMode(false);
     onSave();
@@ -105,19 +109,29 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 text-left">
-          <div className="space-y-4">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-6 text-left">
+          {/* Text Generation Section */}
+          <div className="space-y-4 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/30 dark:bg-zinc-900/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                {language === 'vi' ? 'Cấu hình API Văn bản' : 'Text Generation API'}
+              </h3>
+            </div>
+            
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
-                {language === 'vi' ? 'API Key Tạo Kịch Bản (Gemini)' : 'Text Generation API Key (Gemini)'}
+                {language === 'vi' ? 'API Key (Gemini)' : 'API Key (Gemini)'}
               </label>
               <input
                 type="password"
                 value={geminiKey}
                 onChange={(e) => setGeminiKey(e.target.value)}
                 placeholder={language === 'vi' ? 'Nhập API Key cho tạo kịch bản...' : 'Enter API Key for text generation...'}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
               <p className="text-[10px] text-amber-600 font-medium px-1">
                 {t('apiPermissionTip')}
@@ -129,37 +143,75 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
               <select
                 value={geminiModel}
                 onChange={(e) => setGeminiModel(e.target.value)}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               >
                 <option value="gemini-2.5-flash">Gemini 2.5 Flash ({t('default')})</option>
                 <option value="gemini-3-flash-preview">Gemini 3 Flash ({t('fastEfficient')})</option>
                 <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro ({t('smartSlower')})</option>
               </select>
             </div>
+          </div>
+
+          {/* Image Generation Section */}
+          <div className="space-y-4 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/30 dark:bg-zinc-900/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/50 rounded-lg flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-pink-600" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                {language === 'vi' ? 'Cấu hình API Hình ảnh' : 'Image Generation API'}
+              </h3>
+            </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
-                {language === 'vi' ? 'API Key Tạo Ảnh (Gemini)' : 'Image Generation API Key (Gemini)'}
+                {language === 'vi' ? 'API Key (Gemini)' : 'API Key (Gemini)'}
               </label>
               <input
                 type="password"
                 value={imageKey}
                 onChange={(e) => setImageKey(e.target.value)}
                 placeholder={language === 'vi' ? 'Nhập API Key cho tạo ảnh...' : 'Enter API Key for image generation...'}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
-                {language === 'vi' ? 'API Key Tạo Video (Veo 3)' : 'Video Generation API Key (Veo 3)'}
+                {t('imageVersion')}
+              </label>
+              <select
+                value={imageModel}
+                onChange={(e) => setImageModel(e.target.value)}
+                className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash Image ({t('highQuality')})</option>
+                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image ({t('stable')})</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Video Generation Section */}
+          <div className="space-y-4 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/30 dark:bg-zinc-900/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-purple-600" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                {language === 'vi' ? 'Cấu hình API Video (Veo 3)' : 'Video Generation API (Veo 3)'}
+              </h3>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase ml-1">
+                {language === 'vi' ? 'API Key (Veo 3)' : 'API Key (Veo 3)'}
               </label>
               <input
                 type="password"
                 value={veoKey}
                 onChange={(e) => setVeoKey(e.target.value)}
                 placeholder={language === 'vi' ? 'Nhập API Key cho tạo video...' : 'Enter API Key for video generation...'}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
 
@@ -168,12 +220,13 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
               <select
                 value={veoModel}
                 onChange={(e) => setVeoModel(e.target.value)}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               >
                 <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast ({t('speed')})</option>
                 <option value="veo-3.1-generate-preview">Veo 3.1 High Quality ({t('highQuality')})</option>
               </select>
             </div>
+          </div>
 
             <div className="flex gap-2 pt-2">
               <button
@@ -248,7 +301,6 @@ export const ApiKeySettings: React.FC<{ onSave: () => void; onCancel?: () => voi
           {t('learnAboutBilling')} <ExternalLink className="w-3 h-3" />
         </a>
       </div>
-    </div>
   );
 };
 

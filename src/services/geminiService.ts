@@ -2,7 +2,7 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ProductInfo, AdSegment, Language, AdScript } from "../types";
 import { trackUsage, calculateCost } from "./costService";
 
-const DEFAULT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 const getApiKey = (type: 'gemini' | 'veo' | 'image' = 'gemini') => {
   const manualGeminiKey = typeof window !== 'undefined' ? localStorage.getItem('manual_gemini_api_key') : null;
@@ -641,10 +641,11 @@ export async function generateImage(
   }
 
   const language = (typeof window !== 'undefined' ? localStorage.getItem('app_language') || 'vi' : 'vi') as Language;
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_image_model') || 'gemini-3.1-flash-image-preview' : 'gemini-3.1-flash-image-preview';
 
   try {
     const response = await callGeminiWithRetry({
-      model: 'gemini-3.1-flash-image-preview',
+      model,
       contents: {
         parts,
       },
