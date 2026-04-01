@@ -91,7 +91,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         ...(script?.productInfo?.referenceImages || []),
         ...(script?.productInfo?.imageCategories || []).flatMap(c => c.images)
       ];
-      const limitedRefs = referenceImages.slice(0, 20);
+      const limitedRefs = referenceImages.slice(0, 5);
       
       onUpdateSegment(segment.id, { isGeneratingStart: true });
       const startUrl = await generateImage(segment.imagePrompt + ", start of the scene, high quality", ratio, limitedRefs);
@@ -124,7 +124,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         ...(script?.productInfo?.referenceImages || []),
         ...(script?.productInfo?.imageCategories || []).flatMap(c => c.images)
       ];
-      const limitedRefs = referenceImages.slice(0, 20);
+      const limitedRefs = referenceImages.slice(0, 5);
       
       onUpdateSegment(segment.id, { isGeneratingEnd: true });
       const endUrl = await generateImage(
