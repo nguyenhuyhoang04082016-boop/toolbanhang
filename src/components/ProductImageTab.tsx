@@ -82,43 +82,25 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
     }
   };
 
-  const handleGenerateImages = async (segment: AdSegment) => {
+  const handleGenerateStartImage = async (segment: AdSegment) => {
     if (!segment.imagePrompt || !script) return;
     
     try {
       const ratio = script?.productInfo?.ratio || '9:16';
-      
-      // Collect all reference images
       const referenceImages = [
         ...(script?.productInfo?.referenceImages || []),
         ...(script?.productInfo?.imageCategories || []).flatMap(c => c.images)
       ];
-      
-      // Limit to 20 images to avoid token limits or performance issues
       const limitedRefs = referenceImages.slice(0, 20);
       
-      // Sequential generation: Start image first
       onUpdateSegment(segment.id, { isGeneratingStart: true });
       const startUrl = await generateImage(segment.imagePrompt + ", start of the scene, high quality", ratio, limitedRefs);
       onUpdateSegment(segment.id, { 
         startImageUrl: startUrl,
         isGeneratingStart: false 
       });
-
-      // Then End image
-      onUpdateSegment(segment.id, { isGeneratingEnd: true });
-      const endUrl = await generateImage(
-        segment.imagePrompt + ", end of the scene, high quality", 
-        ratio, 
-        limitedRefs,
-        startUrl // Pass start image for character consistency
-      );
-      onUpdateSegment(segment.id, { 
-        endImageUrl: endUrl,
-        isGeneratingEnd: false 
-      });
     } catch (error: any) {
-      console.error("Error generating images:", error);
+      console.error("Error generating start image:", error);
       const msg = error?.message || "";
       if (msg.includes("Tài khoản Gemini Miễn phí") || msg.includes("Paid") || msg.includes("permission")) {
         if (confirm(msg + (language === 'vi' ? "\n\nBạn có muốn mở phần Cài đặt để chọn API Key khác không?" : "\n\nWould you like to open Settings to select a different API Key?"))) {
@@ -127,28 +109,44 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
       } else {
         alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
       }
-      onUpdateSegment(segment.id, { 
-        isGeneratingStart: false, 
-        isGeneratingEnd: false 
-      });
+      onUpdateSegment(segment.id, { isGeneratingStart: false });
     }
   };
 
-  const handleGenerateAllImages = async () => {
-    if (!script || isGeneratingAll) return;
-    setIsGeneratingAll(true);
+  const handleGenerateEndImage = async (segment: AdSegment) => {
+    if (!segment.imagePrompt || !script) return;
     
-    for (const segment of script.segments) {
-      // Scroll to the segment being generated
-      const element = document.getElementById(`segment-${segment.id}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try {
+      const ratio = script?.productInfo?.ratio || '9:16';
+      const referenceImages = [
+        ...(script?.productInfo?.referenceImages || []),
+        ...(script?.productInfo?.imageCategories || []).flatMap(c => c.images)
+      ];
+      const limitedRefs = referenceImages.slice(0, 20);
+      
+      onUpdateSegment(segment.id, { isGeneratingEnd: true });
+      const endUrl = await generateImage(
+        segment.imagePrompt + ", end of the scene, high quality", 
+        ratio, 
+        limitedRefs,
+        segment.startImageUrl || undefined
+      );
+      onUpdateSegment(segment.id, { 
+        endImageUrl: endUrl,
+        isGeneratingEnd: false 
+      });
+    } catch (error: any) {
+      console.error("Error generating end image:", error);
+      const msg = error?.message || "";
+      if (msg.includes("Tài khoản Gemini Miễn phí") || msg.includes("Paid") || msg.includes("permission")) {
+        if (confirm(msg + (language === 'vi' ? "\n\nBạn có muốn mở phần Cài đặt để chọn API Key khác không?" : "\n\nWould you like to open Settings to select a different API Key?"))) {
+          onOpenApiKeySettings?.();
+        }
+      } else {
+        alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
       }
-      setSelectedSegmentId(segment.id);
-      await handleGenerateImages(segment);
+      onUpdateSegment(segment.id, { isGeneratingEnd: false });
     }
-    
-    setIsGeneratingAll(false);
   };
 
   const handleImageUpload = (category: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,74 +212,7 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
 
   return (
     <div className="p-6 space-y-8 pb-24">
-      {/* Product Analysis Section */}
-      {script.productAnalysis && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
-              <Sparkles className="w-4 h-4" />
-              <h4 className="text-xs font-bold uppercase tracking-wider">{t('featuresAndSpecs')}</h4>
-            </div>
-            <ul className="space-y-2">
-              {(script.productAnalysis?.features || []).concat(script.productAnalysis?.specs || []).slice(0, 4).map((item: string, i: number) => (
-                <li key={i} className="text-xs text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
-                  <CheckCircle2 className="w-3 h-3 mt-0.5 text-emerald-500 flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-              <PlayCircle className="w-4 h-4" />
-              <h4 className="text-xs font-bold uppercase tracking-wider">{t('usageInstructions')}</h4>
-            </div>
-            <ul className="space-y-2">
-              {(script.productAnalysis?.usage || []).slice(0, 4).map((item: string, i: number) => (
-                <li key={i} className="text-xs text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
-                  <div className="w-4 h-4 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i+1}</div>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
-              <h4 className="text-xs font-bold uppercase tracking-wider">{t('keyBenefits')}</h4>
-            </div>
-            <ul className="space-y-2">
-              {(script.productAnalysis?.benefits || []).slice(0, 4).map((item: string, i: number) => (
-                <li key={i} className="text-xs text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-none flex flex-col justify-between text-white">
-            <div className="flex justify-between items-start">
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider opacity-80">{t('ratio')}</h4>
-                <div className="text-2xl font-black">{script.productInfo?.ratio || '9:16'}</div>
-              </div>
-              <div className="space-y-2 text-right">
-                <h4 className="text-xs font-bold uppercase tracking-wider opacity-80">{t('totalLength')}</h4>
-                <div className="text-2xl font-black">{script.productInfo?.totalLength || 6}s</div>
-              </div>
-            </div>
-            <button
-              onClick={onGenerateAnother}
-              disabled={isGenerating}
-              className="w-full py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
-            >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              {t('createAnotherScript')}
-            </button>
-          </div>
-        </div>
-      )}
-
+      {/* Product Analysis Section - Hidden as requested */}
       {/* Image Categories Upload Section */}
       <div className="space-y-6">
         <div className="space-y-4">
@@ -375,18 +306,10 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
         </div>
       </div>
 
-      {/* Segment Selection Icons & Generate All Button */}
+      {/* Segment Selection Icons */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
           <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-[0.2em]">{t('segments')}</h3>
-          <button
-            onClick={handleGenerateAllImages}
-            disabled={isGeneratingAll}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20"
-          >
-            {isGeneratingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-            {t('generateAllImages')}
-          </button>
         </div>
         <div className="flex flex-wrap gap-4 px-2">
           {script.segments.map((segment) => (
@@ -456,7 +379,8 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleGenerateImages(segment);
+                      handleGenerateStartImage(segment);
+                      handleGenerateEndImage(segment);
                     }}
                     disabled={segment.isGeneratingStart || segment.isGeneratingEnd}
                     className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${
@@ -533,12 +457,20 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest text-center block">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center block">
                       {t('startImage')}
                     </label>
-                    <div className="aspect-[9/16] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner">
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!segment.startImageUrl && !segment.isGeneratingStart) {
+                          handleGenerateStartImage(segment);
+                        }
+                      }}
+                      className="aspect-[9/16] w-full max-w-[160px] mx-auto bg-zinc-100 dark:bg-zinc-900 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner cursor-pointer"
+                    >
                       {segment.startImageUrl ? (
                         <>
                           <img src={segment.startImageUrl} alt="Start" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -551,28 +483,39 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                                 a.download = `segment-${segment.index}-start.png`;
                                 a.click();
                               }}
-                              className="p-3 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
+                              className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
                             >
-                              <Download className="w-6 h-6" />
+                              <Download className="w-4 h-4" />
                             </button>
                           </div>
                         </>
                       ) : segment.isGeneratingStart ? (
-                        <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                          <span className="text-[10px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                          <span className="text-[8px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
                         </div>
                       ) : (
-                        <ImageIcon className="w-10 h-10 text-zinc-300" />
+                        <div className="flex flex-col items-center gap-1">
+                          <ImageIcon className="w-6 h-6 text-zinc-300" />
+                          <span className="text-[8px] text-zinc-400 font-bold uppercase">{t('generate')}</span>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest text-center block">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center block">
                       {t('endImage')}
                     </label>
-                    <div className="aspect-[9/16] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner">
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!segment.endImageUrl && !segment.isGeneratingEnd) {
+                          handleGenerateEndImage(segment);
+                        }
+                      }}
+                      className="aspect-[9/16] w-full max-w-[160px] mx-auto bg-zinc-100 dark:bg-zinc-900 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center relative group shadow-inner cursor-pointer"
+                    >
                       {segment.endImageUrl ? (
                         <>
                           <img src={segment.endImageUrl} alt="End" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -585,19 +528,22 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
                                 a.download = `segment-${segment.index}-end.png`;
                                 a.click();
                               }}
-                              className="p-3 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
+                              className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white hover:bg-white/30 transition-all"
                             >
-                              <Download className="w-6 h-6" />
+                              <Download className="w-4 h-4" />
                             </button>
                           </div>
                         </>
                       ) : segment.isGeneratingEnd ? (
-                        <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                          <span className="text-[10px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                          <span className="text-[8px] font-bold text-indigo-500 animate-pulse">{t('generating')}</span>
                         </div>
                       ) : (
-                        <ImageIcon className="w-10 h-10 text-zinc-300" />
+                        <div className="flex flex-col items-center gap-1">
+                          <ImageIcon className="w-6 h-6 text-zinc-300" />
+                          <span className="text-[8px] text-zinc-400 font-bold uppercase">{t('generate')}</span>
+                        </div>
                       )}
                     </div>
                   </div>
