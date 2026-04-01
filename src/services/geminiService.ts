@@ -620,6 +620,42 @@ export async function generateImagePrompts(
   return JSON.parse(extractTextFromResponse(response) || "[]");
 }
 
+/**
+ * Utility to compress and resize base64 images to reduce token usage
+ */
+async function compressImage(base64Str: string, maxWidth = 768, quality = 0.7): Promise<string> {
+  if (typeof window === 'undefined') return base64Str;
+  
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxWidth) {
+          width *= maxWidth / height;
+          height = maxWidth;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(base64Str);
+  });
+}
+
 export async function generateImage(
   prompt: string, 
   aspectRatio: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" = "16:9",
@@ -644,11 +680,20 @@ export async function generateImage(
     throw new Error("Chưa cấu hình API Key cho tạo ảnh. Vui lòng vào phần Cài đặt để nhập Key.");
   }
 
+  // OPTIMIZATION: Compress all reference images to save tokens
+  const optimizedBase64Images = base64Images 
+    ? await Promise.all(base64Images.slice(0, 5).map(img => compressImage(img))) 
+    : [];
+  
+  const optimizedRefUrl = referenceImageUrl && referenceImageUrl.startsWith('data:')
+    ? await compressImage(referenceImageUrl)
+    : referenceImageUrl;
+
   const parts: any[] = [{ text: prompt }];
   
   // Add reference images (product images, etc.)
-  if (base64Images && base64Images.length > 0) {
-    const imageParts = base64Images.map(img => {
+  if (optimizedBase64Images.length > 0) {
+    const imageParts = optimizedBase64Images.map(img => {
       const [header, data] = img.split(',');
       const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
       return {
@@ -662,8 +707,8 @@ export async function generateImage(
   }
 
   // Add reference image for character consistency (start image)
-  if (referenceImageUrl && referenceImageUrl.startsWith('data:')) {
-    const [header, data] = referenceImageUrl.split(',');
+  if (optimizedRefUrl && optimizedRefUrl.startsWith('data:')) {
+    const [header, data] = optimizedRefUrl.split(',');
     const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
     parts.push({
       inlineData: {
