@@ -102,12 +102,14 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
     } catch (error: any) {
       console.error("Error generating start image:", error);
       const msg = error?.message || "";
-      if (msg.includes("Tài khoản Gemini Miễn phí") || msg.includes("Paid") || msg.includes("permission")) {
+      if (msg.includes("403") || msg.includes("Project/API key") || msg.includes("permission") || msg.includes("billing")) {
         if (confirm(msg + (language === 'vi' ? "\n\nBạn có muốn mở phần Cài đặt để chọn API Key khác không?" : "\n\nWould you like to open Settings to select a different API Key?"))) {
           onOpenApiKeySettings?.();
         }
+      } else if (msg.includes("429") || msg.includes("quota")) {
+        alert(msg);
       } else {
-        alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
+        alert(msg || (language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again."));
       }
       onUpdateSegment(segment.id, { isGeneratingStart: false });
     }
@@ -138,12 +140,14 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
     } catch (error: any) {
       console.error("Error generating end image:", error);
       const msg = error?.message || "";
-      if (msg.includes("Tài khoản Gemini Miễn phí") || msg.includes("Paid") || msg.includes("permission")) {
+      if (msg.includes("403") || msg.includes("Project/API key") || msg.includes("permission") || msg.includes("billing")) {
         if (confirm(msg + (language === 'vi' ? "\n\nBạn có muốn mở phần Cài đặt để chọn API Key khác không?" : "\n\nWould you like to open Settings to select a different API Key?"))) {
           onOpenApiKeySettings?.();
         }
+      } else if (msg.includes("429") || msg.includes("quota")) {
+        alert(msg);
       } else {
-        alert(language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again.");
+        alert(msg || (language === 'vi' ? "Không thể tạo ảnh. Vui lòng thử lại." : "Could not generate images. Please try again."));
       }
       onUpdateSegment(segment.id, { isGeneratingEnd: false });
     }
