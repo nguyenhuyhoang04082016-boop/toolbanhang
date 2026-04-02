@@ -1,7 +1,7 @@
 import React from 'react';
 import { AdScript, AdSegment, Language } from '../types';
 import { motion } from 'motion/react';
-import { Image as ImageIcon, Video as VideoIcon, CheckCircle2, Loader2, AlertCircle, PlayCircle } from 'lucide-react';
+import { Image as ImageIcon, Video as VideoIcon, CheckCircle2, Loader2, AlertCircle, PlayCircle, RefreshCw } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 interface GenerationProgressTabProps {
@@ -13,13 +13,15 @@ interface GenerationProgressTabProps {
   }>;
   language: Language;
   onNext: () => void;
+  onRegenerate: () => void;
 }
 
 export const GenerationProgressTab: React.FC<GenerationProgressTabProps> = ({
   script,
   progress,
   language,
-  onNext
+  onNext,
+  onRegenerate
 }) => {
   const { t } = useTranslation(language);
 
@@ -41,17 +43,26 @@ export const GenerationProgressTab: React.FC<GenerationProgressTabProps> = ({
               {t('automationDesc')}
             </p>
           </div>
-          {allDone && (
-            <motion.button
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={onNext}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-all"
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onRegenerate}
+              className="px-6 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-2xl font-bold flex items-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
             >
-              <PlayCircle className="w-5 h-5" />
-              {t('createVideo')}
-            </motion.button>
-          )}
+              <RefreshCw className="w-5 h-5" />
+              {language === 'vi' ? 'Tạo kịch bản khác' : 'Generate another script'}
+            </button>
+            {allDone && (
+              <motion.button
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={onNext}
+                className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 transition-all"
+              >
+                <PlayCircle className="w-5 h-5" />
+                {t('createVideo')}
+              </motion.button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">

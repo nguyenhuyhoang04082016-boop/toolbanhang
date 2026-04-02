@@ -10,13 +10,15 @@ interface VideoGenerationTabProps {
   onUpdateSegments: (segments: AdSegment[]) => void;
   onOpenApiKeySettings?: () => void;
   language: Language;
+  onRegenerate: () => void;
 }
 
 export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
   script,
   onUpdateSegments,
   onOpenApiKeySettings,
-  language
+  language,
+  onRegenerate
 }) => {
   const { t } = useTranslation(language);
   const [videoSegments, setVideoSegments] = useState<AdSegment[]>([]);
@@ -340,14 +342,21 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
 
       {/* Simplified Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 z-50">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto flex gap-4">
+          <button
+            onClick={onRegenerate}
+            className="flex-1 py-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+          >
+            <RefreshCw className="w-5 h-5" />
+            <span className="text-lg uppercase tracking-tight">{language === 'vi' ? 'Tạo kịch bản khác' : 'Generate another script'}</span>
+          </button>
           <button
             onClick={() => {
               if (confirm(language === 'vi' ? 'Bạn có chắc chắn muốn hoàn tất?' : 'Are you sure you want to finish?')) {
                 window.location.reload();
               }
             }}
-            className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-all shadow-xl flex items-center justify-center gap-2"
+            className="flex-[2] py-4 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-all shadow-xl flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-6 h-6" />
             <span className="text-lg uppercase tracking-tight">{language === 'vi' ? 'Hoàn tất' : 'Finish'}</span>

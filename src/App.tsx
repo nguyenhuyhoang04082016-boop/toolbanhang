@@ -431,6 +431,10 @@ export default function App() {
     }
   };
 
+  const handleRegenerate = () => {
+    handleGenerate(productDraft);
+  };
+
   const handleUpdateSegments = (newSegments: AdSegment[]) => {
     if (currentScript) {
       setCurrentScript({ ...currentScript, segments: newSegments });
@@ -753,6 +757,7 @@ export default function App() {
                         progress={segmentProgress}
                         language={language}
                         onNext={() => setActiveTab('videoGen')}
+                        onRegenerate={handleRegenerate}
                       />
                     </ApiKeyGuard>
                   ) : activeTab === 'videoGen' ? (
@@ -763,6 +768,7 @@ export default function App() {
                           onUpdateSegments={handleUpdateSegments}
                           onOpenApiKeySettings={() => setShowApiKeyModal(true)}
                           language={language}
+                          onRegenerate={handleRegenerate}
                         />
                       </div>
                     </ApiKeyGuard>
