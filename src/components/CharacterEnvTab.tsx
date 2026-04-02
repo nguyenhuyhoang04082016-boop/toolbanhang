@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { ProductInfo, ImageCategory, Language } from '../types';
-import { Sparkles, Upload, X, Save, ArrowRight, User, Shirt, Image as ImageIcon, Briefcase } from 'lucide-react';
+import { ProductInfo, ImageCategory, Language, VisualTemplate } from '../types';
+import { Sparkles, Upload, X, Save, ArrowRight, User, Shirt, Image as ImageIcon, Briefcase, ShoppingCart, Trash2, Check, Plus } from 'lucide-react';
 import { useTranslation } from '../i18n';
 
 interface CharacterEnvTabProps {
   product: ProductInfo;
+  visualTemplates: VisualTemplate[];
   onUpdate: (updates: Partial<ProductInfo>) => void;
   onSaveTemplate: (name: string) => void;
+  onDeleteTemplate: (id: string) => void;
+  onUseTemplate: (template: VisualTemplate) => void;
   onNext: () => void;
   language: Language;
 }
@@ -16,9 +19,19 @@ const CATEGORIES: { id: ImageCategory['id']; icon: any }[] = [
   { id: 'costume', icon: Shirt },
   { id: 'background', icon: ImageIcon },
   { id: 'accessories', icon: Briefcase },
+  { id: 'product', icon: ShoppingCart },
 ];
 
-export const CharacterEnvTab: React.FC<CharacterEnvTabProps> = ({ product, onUpdate, onSaveTemplate, onNext, language }) => {
+export const CharacterEnvTab: React.FC<CharacterEnvTabProps> = ({ 
+  product, 
+  visualTemplates,
+  onUpdate, 
+  onSaveTemplate, 
+  onDeleteTemplate,
+  onUseTemplate,
+  onNext, 
+  language 
+}) => {
   const { t } = useTranslation(language);
   const [templateName, setTemplateName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -82,6 +95,87 @@ export const CharacterEnvTab: React.FC<CharacterEnvTabProps> = ({ product, onUpd
           {t('saveVisualTemplate')}
         </button>
       </div>
+
+      {/* Visual Template Shopping Cart Section */}
+      {visualTemplates.length > 0 && (
+        <div className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-3xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-600 text-white rounded-xl">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                {t('visualTemplateCart')}
+              </h3>
+            </div>
+            <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-bold">
+              {visualTemplates.length} {language === 'vi' ? 'mẫu sẵn có' : 'templates available'}
+            </span>
+          </div>
+
+          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x">
+            {visualTemplates.map((template) => (
+              <div 
+                key={template.id}
+                className={`flex-shrink-0 w-64 snap-start group relative bg-white dark:bg-zinc-900 border rounded-2xl p-4 transition-all hover:shadow-lg ${
+                  product.selectedTemplateId === template.id 
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/20' 
+                    : 'border-zinc-200 dark:border-zinc-800'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate pr-2">{template.name}</h4>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                      {new Date(template.timestamp).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => onDeleteTemplate(template.id)}
+                    className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 mb-4">
+                  {template.categories.flatMap(c => c.images).slice(0, 4).map((img, i) => (
+                    <div key={i} className="aspect-square rounded-lg overflow-hidden border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800">
+                      <img src={img} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  ))}
+                  {template.categories.flatMap(c => c.images).length === 0 && (
+                    <div className="col-span-2 aspect-square bg-zinc-50 dark:bg-zinc-800/50 rounded-lg flex items-center justify-center">
+                      <span className="text-[10px] text-zinc-400 italic">{t('noImageYet')}</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => onUseTemplate(template)}
+                  className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                    product.selectedTemplateId === template.id
+                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200 dark:shadow-none'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none'
+                  }`}
+                >
+                  {product.selectedTemplateId === template.id ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      {language === 'vi' ? 'Đã thêm' : 'Added'}
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      {language === 'vi' ? 'Thêm vào dự án' : 'Add to project'}
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {CATEGORIES.map(({ id, icon: Icon }) => (

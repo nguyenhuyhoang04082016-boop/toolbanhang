@@ -24,14 +24,14 @@ export const VideoGenerationTab: React.FC<VideoGenerationTabProps> = ({
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   
   useEffect(() => {
-    if (script && videoSegments.length === 0) {
+    if (script) {
       const initialSegments = script.segments.map(s => ({ ...s }));
       setVideoSegments(initialSegments);
       if (initialSegments.length > 0) {
         setSelectedSegmentId(initialSegments[0].id);
       }
     }
-  }, [script]);
+  }, [script?.id]);
 
   const selectedSegment = videoSegments.find(s => s.id === selectedSegmentId);
 

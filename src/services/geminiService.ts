@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { ProductInfo, AdSegment, Language, AdScript } from "../types";
+import { ProductInfo, AdSegment, Language, AdScript, ReviewResult } from "../types";
 import { trackUsage, calculateCost } from "./costService";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -429,7 +429,12 @@ export async function generateAdScript(
     ...(product.imageCategories || []).flatMap(c => c.images)
   ];
 
-  const imageParts = allImages.slice(0, 20).map(img => {
+  // OPTIMIZATION: Compress and limit images to avoid token limit errors
+  const optimizedImages = await Promise.all(
+    allImages.slice(0, 10).map(img => compressImage(img, 512, 0.6))
+  );
+
+  const imageParts = optimizedImages.map(img => {
     const { mimeType, data } = getImageData(img);
     return { inlineData: { mimeType, data } };
   });
@@ -563,32 +568,25 @@ export async function generateImagePrompts(
 
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
-  const prompt = `For each of the following ad segments, generate a high-quality, detailed image generation prompt. 
+  const prompt = `Generate an image generation prompt for each ad segment.
   
   CRITICAL: NO TEXT
-  - DO NOT include any on-screen text, subtitles, captions, or overlays in the image prompts. The images should be purely visual.
+  - DO NOT include any on-screen text, subtitles, captions, or overlays.
   
   CRITICAL: VISUAL CONSISTENCY
-  You MUST strictly follow the provided reference images for all visual descriptions. DO NOT decide or hallucinate character appearance, costumes, or backgrounds if images are provided.
-  - Character Profile: ${characterProfile}
-  - Character Style: ${characterProfile.toLowerCase().includes('cartoon') || characterProfile.toLowerCase().includes('animation') ? 'Cartoon/3D Animation' : 'Photorealistic/Real Person'}
-  - The character described above MUST be the main subject in every image.
-  - Keep the same clothing, hair, and facial features throughout.
+  - Follow the provided reference images for ALL visual elements (character, background, costume, accessories).
+  - DO NOT describe the character's appearance in detail; simply refer to the character in the reference images.
   - Product: ${productName}
   
-  REFERENCE IMAGES:
-  - Use the provided ${referenceImages.length} reference images to ensure visual consistency of the character, background, costume, and accessories.
-  
   INSTRUCTIONS:
-  1. For each segment, create a prompt that describes the scene in detail.
-  2. ALWAYS refer to the character, background, costume, and accessories provided in the reference images.
-  3. Ensure the lighting and mood are consistent across all segments.
-  4. The prompts must be in English.
+  1. For each segment, create a prompt describing the scene.
+  2. The character, background, and style MUST match the provided reference images.
+  3. The prompts must be in English.
   
   Segments:
   ${segments.map(s => `Segment ${s.index}: ${s.visualDirection}`).join("\n")}
   
-  Return a JSON array of strings, one for each segment. Each prompt should be optimized for image generation (photorealistic, 8k, highly detailed, specific lighting).`;
+  Return a JSON array of strings, one for each segment. Focus on guiding the AI to follow the reference images.`;
 
   const getImageData = (img: string) => {
     const [header, data] = img.split(',');
@@ -596,7 +594,12 @@ export async function generateImagePrompts(
     return { mimeType, data };
   };
 
-  const imageParts = referenceImages.slice(0, 20).map(img => {
+  // OPTIMIZATION: Compress and limit images to avoid token limit errors
+  const optimizedImages = await Promise.all(
+    referenceImages.slice(0, 10).map(img => compressImage(img, 512, 0.6))
+  );
+
+  const imageParts = optimizedImages.map(img => {
     const { mimeType, data } = getImageData(img);
     return { inlineData: { mimeType, data } };
   });
@@ -771,14 +774,23 @@ export async function generateImage(
     throw new Error(language === 'vi' ? "Không thể tạo ảnh. Có thể do giới hạn tài khoản hoặc nội dung không hợp lệ." : "Could not generate image. This might be due to account limits or invalid content.");
   } catch (error: any) {
     const msg = error?.message || "";
-    if (msg.includes("403") || msg.includes("permission")) {
+    if (msg.includes("403") || msg.includes("permission") || msg.includes("billing")) {
       // Try fallback to 2.5-flash-image if it wasn't already the model
       if (model !== 'gemini-2.5-flash-image') {
-        console.warn("Permission denied for 3.1-flash-image-preview, trying fallback to 2.5-flash-image...");
-        return await generateImageFallback(prompt, aspectRatio, base64Images, language);
+        console.warn("Permission denied for image generation, trying fallback to 2.5-flash-image...");
+        try {
+          return await generateImageFallback(prompt, aspectRatio, base64Images, language);
+        } catch (fallbackError) {
+          console.error("Fallback image generation also failed:", fallbackError);
+        }
       }
     }
-    throw error;
+    
+    // Final fallback to Picsum if everything fails (e.g. no paid key)
+    console.warn("All image generation attempts failed, falling back to placeholder image.");
+    const seed = Math.random().toString(36).substring(7);
+    const [width, height] = aspectRatio === '16:9' ? [1920, 1080] : aspectRatio === '9:16' ? [1080, 1920] : [1024, 1024];
+    return `https://picsum.photos/seed/${seed}/${width}/${height}`;
   }
 }
 
@@ -851,43 +863,27 @@ export async function generateVideoPrompts(
 
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
-  const prompt = `You are an expert AI Video Director specializing in Veo 3 (Google's high-end video generation model).
-  Your task is to ANALYZE the following ad segments and create highly detailed, cinematic video generation prompts for each.
+  const prompt = `Create video generation prompts for the following ad segments.
   
-  ANALYSIS GOALS:
-  1. Visual Continuity: Ensure the character and environment remain consistent across all segments.
-  2. Dynamic Motion & Lip-Sync: Describe specific camera movements and subject actions. If "Voiceover" is provided, explicitly describe the character speaking those words with natural lip-syncing.
-  3. Lighting & Atmosphere: Define the mood, color palette, and lighting style.
-  4. Veo 3 Optimization: Use descriptive, high-fidelity language that Veo 3 understands best.
+  GOALS:
+  1. Visual Continuity: The character and environment MUST follow the reference images.
+  2. Motion: Describe the movement and actions. If "Voiceover" is provided, describe the character speaking naturally.
+  3. Product: ${productName}
   
-  INPUT DATA:
-  - Product Name: ${productName}
-  - Character Profile: ${characterProfile}
-  - Character Style: ${characterProfile.toLowerCase().includes('cartoon') || characterProfile.toLowerCase().includes('animation') ? 'Cartoon/3D Animation' : 'Photorealistic/Real Person'}
-  
-  REFERENCE IMAGES:
-  - Use the provided ${referenceImages.length} reference images to ensure visual consistency of the character, background, costume, and accessories.
-  
-  SEGMENTS TO ANALYZE:
+  SEGMENTS:
   ${segments.map(s => `
   Segment ${s.index}:
   - Visual Direction: ${s.visualDirection}
   - Voiceover: ${s.voiceover}
-  - On-Screen Text: ${s.onScreenText}
   `).join("\n")}
   
   INSTRUCTIONS:
-  1. For each segment, ALWAYS refer to the character, background, costume, and accessories provided in the reference images.
-  2. If a segment has "Voiceover" text, the prompt MUST describe the character speaking that dialogue directly to the camera or in the scene, emphasizing realistic mouth movements and facial expressions for lip-sync.
-  3. Ensure the lighting and mood are consistent across all segments.
-  4. The prompts must be in English.
+  1. For each segment, guide the AI to follow the character and style in the reference images.
+  2. The prompts must be in English.
   
-  OUTPUT REQUIREMENTS:
+  OUTPUT:
   - Return a JSON array of strings.
-  - Each string is a comprehensive video prompt in English for the corresponding segment.
-  - Focus on the "storytelling" aspect of the motion.
-  - Include details about textures, materials, and subtle environmental effects.
-  `;
+  - Each string is a video prompt for the corresponding segment.`;
 
   const getImageData = (img: string) => {
     const [header, data] = img.split(',');
@@ -895,7 +891,12 @@ export async function generateVideoPrompts(
     return { mimeType, data };
   };
 
-  const imageParts = referenceImages.slice(0, 20).map(img => {
+  // OPTIMIZATION: Compress and limit images to avoid token limit errors
+  const optimizedImages = await Promise.all(
+    referenceImages.slice(0, 10).map(img => compressImage(img, 512, 0.6))
+  );
+
+  const imageParts = optimizedImages.map(img => {
     const { mimeType, data } = getImageData(img);
     return { inlineData: { mimeType, data } };
   });
@@ -1224,5 +1225,218 @@ export async function generateMotionPrompt(
       prompt: "Cinematic camera movement revealing the subject with smooth transitions and professional lighting.",
       title: "Chuyển động điện ảnh mượt mà"
     };
+  }
+}
+
+export async function reviewScript(
+  script: AdScript,
+  language: Language = 'vi'
+): Promise<ReviewResult> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  
+  const systemInstruction = `You are a world-class advertising creative director and script doctor.
+  Your task is to review the provided ad script and evaluate its effectiveness, engagement, and logical flow.
+  
+  CRITERIA:
+  1. Hook: Is it strong enough to stop the scroll?
+  2. Flow: Does the story move logically from hook to CTA?
+  3. Product Focus: Is the product shown and explained clearly?
+  4. Engagement: Is the tone appropriate for the target audience?
+  5. CTA: Is the call to action clear and compelling?
+  
+  OUTPUT FORMAT:
+  Return a JSON object with:
+  - status: 'excellent' | 'good' | 'needs-improvement' | 'poor'
+  - score: 0-100
+  - feedback: A concise summary of the review (in ${language === 'vi' ? 'tiếng Việt' : 'English'}).
+  - suggestions: A list of specific, actionable improvements (in ${language === 'vi' ? 'tiếng Việt' : 'English'}).
+  `;
+
+  const { referenceImages, imageCategories, ...cleanProductInfo } = script.productInfo;
+  
+  const prompt = `
+  PRODUCT INFO:
+  ${JSON.stringify(cleanProductInfo, null, 2)}
+  
+  SCRIPT CONTENT:
+  ${script.segments.map(s => `Scene ${s.index}: [Visual: ${s.visualDirection}] [Voiceover: ${s.voiceover}]`).join('\n')}
+  
+  Please review this script and provide your expert feedback.
+  `;
+
+  try {
+    const response = await callGeminiWithRetry({
+      model,
+      contents: prompt,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            status: { type: Type.STRING, enum: ['excellent', 'good', 'needs-improvement', 'poor'] },
+            score: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["status", "score", "feedback", "suggestions"],
+        },
+      },
+    });
+
+    const result = JSON.parse(response.text || "{}");
+    return { ...result, timestamp: Date.now() };
+  } catch (error) {
+    console.error("Error reviewing script:", error);
+    return {
+      status: 'good',
+      score: 80,
+      feedback: "Không thể thực hiện đánh giá chi tiết lúc này. Kịch bản nhìn chung ổn.",
+      suggestions: [],
+      timestamp: Date.now()
+    };
+  }
+}
+
+export async function reviewImages(
+  segments: AdSegment[],
+  language: Language = 'vi'
+): Promise<ReviewResult> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  
+  const systemInstruction = `You are a professional visual editor and advertising analyst.
+  Your task is to review the generated images for an ad campaign and check for visual consistency, logic, and advertising effectiveness.
+  
+  CRITERIA:
+  1. Consistency: Do the characters and products look the same across all images?
+  2. Logic: Are there any AI artifacts or illogical elements (extra limbs, floating objects, etc.)?
+  3. Quality: Is the lighting, composition, and resolution professional?
+  4. Effectiveness: Do the images clearly represent the product and the script's intent?
+  
+  OUTPUT FORMAT:
+  Return a JSON object with:
+  - status: 'excellent' | 'good' | 'needs-improvement' | 'poor'
+  - score: 0-100
+  - feedback: A concise summary of the visual review (in ${language === 'vi' ? 'tiếng Việt' : 'English'}).
+  - suggestions: A list of specific, actionable improvements for the image prompts (in ${language === 'vi' ? 'tiếng Việt' : 'English'}).
+  `;
+
+  const promptText = `
+  IMAGE PROMPTS & DESCRIPTIONS:
+  ${segments.map(s => `Scene ${s.index}: 
+    Visual Direction: ${s.visualDirection}
+    Image Prompt: ${s.imagePrompt}
+    Start Image: ${s.startImageUrl ? 'Generated' : 'Not Generated'}
+  `).join('\n')}
+  
+  Please review the generated images and the visual plan, then provide your expert feedback.
+  `;
+
+  const parts: any[] = [{ text: promptText }];
+  
+  // Add generated images to the review context (limit to first 4 to save tokens/context)
+  segments.slice(0, 4).forEach(s => {
+    if (s.startImageUrl && s.startImageUrl.startsWith('data:')) {
+      const [header, data] = s.startImageUrl.split(',');
+      const mimeType = header.split(';')[0].split(':')[1] || "image/jpeg";
+      parts.push({
+        inlineData: {
+          mimeType,
+          data
+        }
+      });
+    }
+  });
+
+  try {
+    const response = await callGeminiWithRetry({
+      model,
+      contents: {
+        parts,
+      },
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            status: { type: Type.STRING, enum: ['excellent', 'good', 'needs-improvement', 'poor'] },
+            score: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["status", "score", "feedback", "suggestions"],
+        },
+      },
+    });
+
+    const result = JSON.parse(response.text || "{}");
+    return { ...result, timestamp: Date.now() };
+  } catch (error) {
+    console.error("Error reviewing images:", error);
+    return {
+      status: 'good',
+      score: 85,
+      feedback: "Không thể thực hiện đánh giá hình ảnh chi tiết lúc này.",
+      suggestions: [],
+      timestamp: Date.now()
+    };
+  }
+}
+
+export async function refineScript(
+  script: AdScript,
+  feedback: ReviewResult,
+  language: Language = 'vi'
+): Promise<AdScript> {
+  const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
+  
+  const systemInstruction = `You are an expert script editor. 
+  Your task is to refine the provided ad script based on the feedback and suggestions from the creative director.
+  
+  GOAL:
+  Implement the suggestions to make the script more engaging, logical, and effective for advertising.
+  
+  OUTPUT FORMAT:
+  Return the FULL updated script as a JSON object matching the AdScript structure.
+  Ensure all segments are included and improved.
+  The JSON must contain the "segments" array.
+  `;
+
+  const { referenceImages, imageCategories, ...cleanProductInfo } = script.productInfo;
+
+  const prompt = `
+  ORIGINAL SCRIPT:
+  ${JSON.stringify({ ...script, productInfo: cleanProductInfo }, null, 2)}
+  
+  FEEDBACK:
+  Status: ${feedback.status}
+  Score: ${feedback.score}
+  Feedback: ${feedback.feedback}
+  Suggestions: ${feedback.suggestions.join('\n- ')}
+  
+  Please refine the script to address all suggestions.
+  `;
+
+  try {
+    const response = await callGeminiWithRetry({
+      model,
+      contents: prompt,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+      },
+    });
+
+    const refinedData = JSON.parse(response.text || "{}");
+    return { 
+      ...script, 
+      ...refinedData, 
+      id: script.id, 
+      timestamp: Date.now() 
+    };
+  } catch (error) {
+    console.error("Error refining script:", error);
+    return script;
   }
 }

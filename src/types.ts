@@ -127,6 +127,15 @@ export interface UsageStats {
   };
 }
 
+export interface ReviewResult {
+  status: 'excellent' | 'good' | 'needs-improvement' | 'poor';
+  score: number; // 0-100
+  feedback: string;
+  suggestions: string[];
+  autoFixed?: boolean;
+  timestamp: number;
+}
+
 export interface AdScript {
   id: string;
   timestamp: number;

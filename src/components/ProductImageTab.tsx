@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { AdScript, AdSegment, Language, ProductInfo } from '../types';
-import { Image as ImageIcon, Sparkles, Loader2, RefreshCw, Download, Send, Upload, X as XIcon, CheckCircle2, List, Settings, PlayCircle, Info } from 'lucide-react';
+import { AdScript, AdSegment, Language, ProductInfo, ReviewResult } from '../types';
+import { Image as ImageIcon, Sparkles, Loader2, RefreshCw, Download, Send, Upload, X as XIcon, CheckCircle2, List, Settings, PlayCircle, Info, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateImage, refineImagePrompt, generateVideo } from '../services/geminiService';
 import { useTranslation } from '../i18n';
+import { AiAssistantReview } from './AiAssistantReview';
 
 interface ProductImageTabProps {
   script: AdScript | null;
@@ -14,6 +15,9 @@ interface ProductImageTabProps {
   onOpenApiKeySettings?: () => void;
   language: Language;
   isGenerating?: boolean;
+  imageReview: ReviewResult | null;
+  isReviewingImages: boolean;
+  onReviewImages: () => void;
 }
 
 export const ProductImageTab: React.FC<ProductImageTabProps> = ({ 
@@ -24,7 +28,10 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
   onNext,
   onOpenApiKeySettings,
   language,
-  isGenerating = false
+  isGenerating = false,
+  imageReview,
+  isReviewingImages,
+  onReviewImages
 }) => {
   const { t } = useTranslation(language);
   const [viPrompts, setViPrompts] = useState<Record<string, string>>({});
@@ -216,6 +223,26 @@ export const ProductImageTab: React.FC<ProductImageTabProps> = ({
 
   return (
     <div className="p-6 space-y-8 pb-24">
+      {/* AI Assistant Review Section */}
+      <AiAssistantReview 
+        review={imageReview} 
+        isReviewing={isReviewingImages} 
+        language={language}
+        type="image"
+      />
+
+      {!imageReview && !isReviewingImages && (
+        <div className="mb-6 flex justify-center">
+          <button
+            onClick={onReviewImages}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 dark:shadow-none"
+          >
+            <ShieldCheck className="w-5 h-5" />
+            {language === 'vi' ? 'Trợ lý AI: Kiểm tra Hình ảnh' : 'AI Assistant: Review Images'}
+          </button>
+        </div>
+      )}
+
       {/* Product Analysis Section - Hidden as requested */}
       {/* Image Categories Upload Section */}
       <div className="space-y-6">

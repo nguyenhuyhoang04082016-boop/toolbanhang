@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { SettingsBar } from './components/SettingsBar';
 import { ProductForm } from './components/ProductForm';
 import { CharacterEnvTab } from './components/CharacterEnvTab';
-import { ProductAssetsTab } from './components/ProductAssetsTab';
-import { ProductImageTab } from './components/ProductImageTab';
-import { ScriptOrientationTab } from './components/ScriptOrientationTab';
 import { VideoGenerationTab } from './components/VideoGenerationTab';
+import { GenerationProgressTab } from './components/GenerationProgressTab';
 import { SavedTemplatesTab } from './components/SavedTemplatesTab';
 import { ApiKeyGuard, ApiKeySettings } from './components/ApiKeyGuard';
 import { AdScript, AdSegment, Language, ProductInfo, SavedTemplate, VisualTemplate } from './types';
@@ -16,16 +14,20 @@ import {
   generateVideoPrompts, 
   inferScriptOrientation,
   generateImage,
-  generateVideo
+  generateVideo,
+  reviewScript,
+  reviewImages,
+  refineScript
 } from './services/geminiService';
 import { motion, AnimatePresence } from 'motion/react';
-import { Info, Image as ImageIcon, Bookmark, Globe, Sparkles, ShoppingCart, Trash2, Plus, List, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { Info, Image as ImageIcon, Bookmark, Globe, Sparkles, ShoppingCart, Trash2, Plus, List, PlayCircle, CheckCircle2, ShieldCheck, AlertTriangle, RefreshCw, Activity } from 'lucide-react';
 
 import { UsageDashboard } from './components/UsageDashboard';
 import { useTranslation } from './i18n';
+import { ReviewResult } from './types';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'characterEnv' | 'productImages' | 'orientation' | 'results' | 'videoGen' | 'templates'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'characterEnv' | 'results' | 'videoGen' | 'templates'>('form');
 
   const [language, setLanguage] = useState<Language>('vi');
   const { t } = useTranslation(language);
@@ -33,8 +35,16 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [isInferring, setIsInferring] = useState(false);
   const [currentScript, setCurrentScript] = useState<AdScript | null>(null);
+  const [scriptReview, setScriptReview] = useState<ReviewResult | null>(null);
+  const [imageReview, setImageReview] = useState<ReviewResult | null>(null);
+  const [isReviewingScript, setIsReviewingScript] = useState(false);
+  const [isReviewingImages, setIsReviewingImages] = useState(false);
+  const [segmentProgress, setSegmentProgress] = useState<Record<string, { 
+    image: 'pending' | 'loading' | 'done' | 'error', 
+    video: 'pending' | 'loading' | 'done' | 'error',
+    videoUrl?: string 
+  }>>({});
   const [history, setHistory] = useState<AdScript[]>([]);
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
   const [visualTemplates, setVisualTemplates] = useState<VisualTemplate[]>([]);
@@ -254,29 +264,6 @@ export default function App() {
     }
   }, [darkMode]);
 
-  const handleInferOrientation = async () => {
-    if (!productDraft.name) return;
-    setIsInferring(true);
-    try {
-      const inferred = await inferScriptOrientation(productDraft, language);
-      setProductDraft(prev => ({
-        ...prev,
-        scriptOrientation: {
-          ...prev.scriptOrientation,
-          style: inferred.style,
-          dialogueType: inferred.dialogueType as any,
-          targetAudience: inferred.targetAudience,
-          keyMessage: inferred.keyMessage,
-          toneOfVoice: inferred.toneOfVoice
-        }
-      }));
-    } catch (error) {
-      console.error("Failed to infer orientation", error);
-    } finally {
-      setIsInferring(false);
-    }
-  };
-
   const handleGenerate = async (product: ProductInfo) => {
     setIsLoading(true);
     setLoadingProgress(10);
@@ -295,15 +282,22 @@ export default function App() {
         };
         setProductDraft(finalProduct);
       }
-      setLoadingProgress(30);
 
       // 1. Generate Script
+      setLoadingProgress(20);
       const { segments, seamlessScript, productAnalysis } = await generateAdScript(finalProduct, language, brandVoice);
-      setLoadingProgress(60);
+      setLoadingProgress(40);
+      
+      // Initialize progress state
+      const initialProgress: Record<string, any> = {};
+      segments.forEach(s => {
+        initialProgress[s.id] = { image: 'pending', video: 'pending' };
+      });
+      setSegmentProgress(initialProgress);
       
       // 2. Generate Character Profile for consistency
       const characterProfile = await generateCharacterProfile(product);
-      setLoadingProgress(70);
+      setLoadingProgress(45);
       
       const allImages = [
         ...(product.referenceImages || []),
@@ -312,33 +306,122 @@ export default function App() {
 
       // 3. Generate Image Prompts for each segment
       const imagePrompts = await generateImagePrompts(segments, characterProfile, product.name, allImages);
-      setLoadingProgress(85);
+      setLoadingProgress(55);
       
-      // 3.5 Generate Video Prompts
-      const videoPrompts = await generateVideoPrompts(segments, characterProfile, product.name, allImages);
-      setLoadingProgress(95);
-      
-      const segmentsWithPrompts = segments.map((s, i) => ({
-        ...s,
-        imagePrompt: imagePrompts[i] || "",
-        videoPrompt: videoPrompts[i] || ""
-      }));
-
-      const newScript: AdScript = {
+      // 4. AI Assistant Script Review & Auto-refine
+      setIsReviewingScript(true);
+      const initialScript: AdScript = {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: Date.now(),
         language,
-        segments: segmentsWithPrompts,
+        segments: segments.map((s, i) => ({ ...s, imagePrompt: imagePrompts[i] || "" })),
         seamlessScript,
         productAnalysis,
         productInfo: product,
         characterProfile,
       };
       
-      setCurrentScript(newScript);
-      setHistory((prev) => [newScript, ...prev].slice(0, 20));
-      setLoadingProgress(100);
-      setTimeout(() => setActiveTab('results'), 500);
+      const scriptReviewResult = await reviewScript(initialScript, language);
+      setScriptReview(scriptReviewResult);
+      setIsReviewingScript(false);
+      
+      let finalScript = initialScript;
+      if (scriptReviewResult.score < 60) {
+        finalScript = await refineScript(initialScript, scriptReviewResult, language);
+        const secondReview = await reviewScript(finalScript, language);
+        setScriptReview({ ...secondReview, autoFixed: true });
+      }
+      setLoadingProgress(65);
+      setCurrentScript(finalScript);
+      setActiveTab('results'); // Switch to progress tab early
+      setIsLoading(false); // Hide full-screen overlay to show progress tab
+
+      // 5. Generate Images for all segments
+      const segmentsWithImages = await Promise.all(finalScript.segments.map(async (segment) => {
+        setSegmentProgress(prev => ({
+          ...prev,
+          [segment.id]: { ...prev[segment.id], image: 'loading' }
+        }));
+        try {
+          const startImageUrl = await generateImage(
+            segment.imagePrompt, 
+            finalProduct.ratio === '9:16' ? '9:16' : '16:9',
+            allImages,
+            allImages[0]
+          );
+          setSegmentProgress(prev => ({
+            ...prev,
+            [segment.id]: { ...prev[segment.id], image: 'done' }
+          }));
+          return { ...segment, startImageUrl };
+        } catch (error) {
+          console.error(`Failed to generate image for segment ${segment.id}`, error);
+          setSegmentProgress(prev => ({
+            ...prev,
+            [segment.id]: { ...prev[segment.id], image: 'error' }
+          }));
+          return segment;
+        }
+      }));
+      finalScript = { ...finalScript, segments: segmentsWithImages };
+      setCurrentScript(finalScript);
+
+      // 6. Image Review
+      setIsReviewingImages(true);
+      const imgReview = await reviewImages(segmentsWithImages, language);
+      setImageReview(imgReview);
+      setIsReviewingImages(false);
+      
+      // 7. Generate Video Prompts
+      const videoPrompts = await generateVideoPrompts(segmentsWithImages, characterProfile, product.name, allImages);
+      const segmentsWithVideoPrompts = segmentsWithImages.map((s, i) => ({
+        ...s,
+        videoPrompt: videoPrompts[i] || ""
+      }));
+      
+      finalScript = { ...finalScript, segments: segmentsWithVideoPrompts };
+      setCurrentScript(finalScript);
+
+      // 8. Generate Videos for all segments (Automated)
+      await Promise.all(finalScript.segments.map(async (segment) => {
+        setSegmentProgress(prev => ({
+          ...prev,
+          [segment.id]: { ...prev[segment.id], video: 'loading' }
+        }));
+        try {
+          const videoUrl = await generateVideo(
+            segment.videoPrompt,
+            segment.startImageUrl,
+            undefined,
+            finalProduct.ratio === '9:16' ? '9:16' : '16:9'
+          );
+          
+          setSegmentProgress(prev => ({
+            ...prev,
+            [segment.id]: { ...prev[segment.id], video: 'done', videoUrl }
+          }));
+
+          // Update the segment in the script too
+          setCurrentScript(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              segments: prev.segments.map(s => s.id === segment.id ? { ...s, videoUrl } : s)
+            };
+          });
+        } catch (error) {
+          console.error(`Failed to generate video for segment ${segment.id}`, error);
+          setSegmentProgress(prev => ({
+            ...prev,
+            [segment.id]: { ...prev[segment.id], video: 'error' }
+          }));
+        }
+      }));
+
+      setHistory((prev) => [finalScript, ...prev].slice(0, 20));
+      
+      // Automatically switch to video results when everything is done
+      setTimeout(() => setActiveTab('videoGen'), 1000);
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Không thể tạo kịch bản. Vui lòng kiểm tra lại kết nối hoặc thử lại sau.';
@@ -348,37 +431,9 @@ export default function App() {
     }
   };
 
-  const handleUpdateSegment = (segmentId: string, updates: Partial<AdSegment>) => {
-    setCurrentScript(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        segments: prev.segments.map(s => 
-          s.id === segmentId ? { ...s, ...updates } : s
-        )
-      };
-    });
-  };
-
-  const handleUpdateProductInfo = (updates: Partial<ProductInfo>) => {
-    setCurrentScript(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        productInfo: { ...prev.productInfo, ...updates }
-      };
-    });
-  };
-
   const handleUpdateSegments = (newSegments: AdSegment[]) => {
     if (currentScript) {
       setCurrentScript({ ...currentScript, segments: newSegments });
-    }
-  };
-
-  const handleRegenerate = () => {
-    if (currentScript) {
-      handleGenerate(currentScript.productInfo);
     }
   };
 
@@ -487,7 +542,7 @@ export default function App() {
                     width: `${(
                       activeTab === 'automation' ? 100 :
                       activeTab === 'templates' ? 0 :
-                      Math.max(0, ['form', 'characterEnv', 'productImages', 'orientation', 'results', 'videoGen'].indexOf(activeTab)) / 5 * 100
+                      Math.max(0, ['form', 'characterEnv', 'results', 'videoGen'].indexOf(activeTab)) / 3 * 100
                     )}%` 
                   }} 
                 />
@@ -495,14 +550,12 @@ export default function App() {
                 {[
                   { id: 'form', icon: Info, label: t('productInfo') },
                   { id: 'characterEnv', icon: Sparkles, label: t('characterAndEnv') },
-                  { id: 'productImages', icon: ImageIcon, label: t('productImages') },
-                  { id: 'orientation', icon: Sparkles, label: t('scriptOrientation') },
-                  { id: 'results', icon: List, label: t('scriptAndImages'), disabled: !currentScript },
+                  { id: 'results', icon: Activity, label: t('scriptAndImages'), disabled: !currentScript },
                   { id: 'videoGen', icon: PlayCircle, label: t('createVideo'), disabled: !currentScript }
                 ].map((step, index) => {
                   const Icon = step.icon;
                   const isActive = activeTab === step.id || (step.id === 'videoGen' && activeTab === 'automation');
-                  const isCompleted = (['form', 'characterEnv', 'productImages', 'orientation', 'results', 'videoGen'].indexOf(activeTab) > index) || (activeTab === 'automation' && index < 5);
+                  const isCompleted = (['form', 'characterEnv', 'results', 'videoGen'].indexOf(activeTab) > index) || (activeTab === 'automation' && index < 3);
                   const isDisabled = step.disabled && activeTab !== 'automation';
 
                   return (
@@ -602,7 +655,11 @@ export default function App() {
                   <div className="text-center space-y-4 w-full max-w-md">
                     <div className="space-y-2">
                       <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-                        {activeTab === 'form' ? t('aiAnalyzingProduct') : t('generatingScript')}
+                        {loadingProgress < 20 ? t('aiAnalyzingProduct') : 
+                         loadingProgress < 50 ? t('generatingScript') :
+                         loadingProgress < 70 ? t('reviewingScript') :
+                         loadingProgress < 90 ? t('generatingImages') :
+                         t('finalizing')}
                       </h3>
                       <p className="text-sm text-zinc-500">
                         {t('aiAnalyzing')}
@@ -680,51 +737,23 @@ export default function App() {
                     <div className="max-w-4xl mx-auto">
                       <CharacterEnvTab
                         product={productDraft}
-                        onUpdate={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
-                        onSaveTemplate={handleSaveVisualTemplate}
-                        onNext={() => setActiveTab('productImages')}
-                        language={language}
-                      />
-                    </div>
-                  ) : activeTab === 'productImages' ? (
-                    <div className="max-w-4xl mx-auto">
-                      <ProductAssetsTab
-                        product={productDraft}
                         visualTemplates={visualTemplates}
                         onUpdate={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
+                        onSaveTemplate={handleSaveVisualTemplate}
                         onDeleteTemplate={handleDeleteVisualTemplate}
                         onUseTemplate={handleUseVisualTemplate}
-                        onNext={() => setActiveTab('orientation')}
-                        isLoading={isLoading}
-                        language={language}
-                      />
-                    </div>
-                  ) : activeTab === 'orientation' ? (
-                    <div className="max-w-4xl mx-auto">
-                      <ScriptOrientationTab
-                        product={productDraft}
-                        onUpdate={(updates) => setProductDraft(prev => ({ ...prev, ...updates }))}
-                        onGenerate={() => handleGenerate(productDraft)}
-                        onInfer={handleInferOrientation}
-                        isLoading={isLoading}
-                        isInferring={isInferring}
+                        onNext={() => handleGenerate(productDraft)}
                         language={language}
                       />
                     </div>
                   ) : activeTab === 'results' ? (
                     <ApiKeyGuard language={language}>
-                      <div className="max-w-6xl mx-auto">
-                        <ProductImageTab 
-                          script={currentScript} 
-                          onUpdateSegment={handleUpdateSegment} 
-                          onUpdateProductInfo={handleUpdateProductInfo}
-                          onGenerateAnother={handleRegenerate}
-                          onNext={() => setActiveTab('videoGen')}
-                          onOpenApiKeySettings={() => setShowApiKeyModal(true)}
-                          language={language}
-                          isGenerating={isLoading}
-                        />
-                      </div>
+                      <GenerationProgressTab
+                        script={currentScript}
+                        progress={segmentProgress}
+                        language={language}
+                        onNext={() => setActiveTab('videoGen')}
+                      />
                     </ApiKeyGuard>
                   ) : activeTab === 'videoGen' ? (
                     <ApiKeyGuard language={language}>
