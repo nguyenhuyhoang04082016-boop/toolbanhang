@@ -363,9 +363,10 @@ export async function generateAdScript(
   5. CLEAR CTA (Kết thúc bằng 1 CTA rõ ràng): Define exactly what the viewer should do (Buy, Share, Follow). Give them a logical reason to interact immediately.
   
   STEP 3: PACING & DIALOGUE (USER PREFERENCE)
-  - FAST PACING: The action and visual changes in each segment MUST be fast-paced and dynamic.
-  - INCREASED DIALOGUE: Include more character dialogue or narration than usual.
-  - EVEN DISTRIBUTION: Ensure the dialogue is spread evenly across ALL segments. No segment should be silent or overly crowded compared to others.
+  - ULTRA-FAST PACING: The action, visual changes, and transitions in each segment MUST be extremely fast-paced, dynamic, and high-energy.
+  - PUNCHY DIALOGUE: Use short, impactful sentences. Avoid long explanations.
+  - INCREASED DIALOGUE: Include more character dialogue or narration than usual, but keep it snappy.
+  - EVEN DISTRIBUTION: Ensure the dialogue is spread evenly across ALL segments.
   
   STEP 4: GENERATE AD SCRIPT
   Based on the analysis and user requirements, generate a high-converting, seamless ad script for Veo 3.
@@ -390,6 +391,10 @@ export async function generateAdScript(
   `}
   
   - IMPORTANT: If a character image is provided, DO NOT describe the character's appearance (eyes, hair, face, etc.) in the visualDirection. Simply refer to them as "the character" or "the person" and state that they must strictly match the provided reference images.
+  - VISUAL FOCUS: All segments MUST focus on both the character and the product.
+  - FAST CUTS: Use descriptions that imply fast cuts, quick movements, and dynamic transitions.
+  - HOOK SCENE (Segment 1): Can be flexible and dynamic to grab attention.
+  - SUBSEQUENT SCENES (Segment 2+): MUST clearly show both the character and the product together in the frame.
   - The script must be seamless and natural.
   - Split the script into segments of exactly 8 seconds each.
   - MANDATORY: You MUST generate exactly ${Math.ceil((product.totalLength || 32) / 8)} segments.
@@ -589,8 +594,9 @@ export async function generateImagePrompts(
   
   INSTRUCTIONS:
   1. For each segment, create a START prompt (initial pose) and an END prompt (final pose after 3-5s of motion).
-  2. The character, background, and style MUST match the provided reference images.
-  3. The prompts must be in English.
+  2. The END prompt MUST describe a dynamic, high-energy final pose to encourage fast motion. Mention "dynamic motion blur" if it helps convey speed.
+  3. The character, background, and style MUST match the provided reference images.
+  4. The prompts must be in English.
   
   Segments:
   ${segments.map(s => `Segment ${s.index}: ${s.visualDirection}`).join("\n")}
@@ -890,10 +896,11 @@ export async function generateVideoPrompt(
   
   GOALS:
   1. Start Frame: The video MUST start exactly from the provided "Start Image".
-  2. Visual Continuity: Maintain the character, costume, and environment style from the "Reference Images".
-  3. Motion & Action: Describe the motion that follows the "Visual Direction" and "Voiceover" script, starting from the pose in the "Start Image".
-  4. FAST PACING: The motion and actions described MUST be dynamic, energetic, and fast-paced.
-  5. Lip-Sync: If "Voiceover" is provided, explicitly describe the character's mouth moving to speak those words naturally.
+  2. Visual Continuity: Maintain the character, costume, and environment style from the "Reference Images". DO NOT describe the character's appearance in detail; simply state that the character matches the provided images.
+  3. Visual Focus: The video MUST focus on both the character and the product.
+  4. ULTRA-FAST MOTION: Describe actions using high-energy verbs (e.g., "quickly grabs", "rapidly demonstrates", "energetically speaks"). The motion MUST be extremely fast-paced and dynamic.
+  5. DYNAMIC CAMERA & STYLE: Use dynamic camera movements (e.g., "fast zoom-in", "rapid pan", "energetic tracking shot") and mention "motion blur" or "fast-paced editing style" to increase the sense of speed.
+  6. Lip-Sync: If "Voiceover" is provided, explicitly describe the character's mouth moving to speak those words naturally and rapidly.
   
   INSTRUCTIONS:
   1. Analyze the "Start Image" (the first image) and the "Reference Images".
