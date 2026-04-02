@@ -849,41 +849,40 @@ async function generateImageFallback(
   }
 }
 
-export async function generateVideoPrompts(
-  segments: AdSegment[],
+export async function generateVideoPrompt(
+  segment: AdSegment,
   characterProfile: string,
   productName: string,
   referenceImages: string[] = []
-): Promise<string[]> {
+): Promise<string> {
   // Check for Mock Mode
   const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
   if (isMockMode) {
-    return segments.map(() => "A cinematic product reveal");
+    return "A cinematic product reveal";
   }
 
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
-  const prompt = `Create video generation prompts for the following ad segments.
+  const prompt = `Create a cinematic video generation prompt for this specific ad segment.
+  
+  CONTEXT:
+  - Product: ${productName}
+  - Character Profile: ${characterProfile}
+  - Segment Visual Direction: ${segment.visualDirection}
+  - Segment Voiceover: ${segment.voiceover}
   
   GOALS:
-  1. Visual Continuity: The character and environment MUST follow the reference images.
-  2. Motion: Describe the movement and actions. If "Voiceover" is provided, describe the character speaking naturally.
-  3. Product: ${productName}
-  
-  SEGMENTS:
-  ${segments.map(s => `
-  Segment ${s.index}:
-  - Visual Direction: ${s.visualDirection}
-  - Voiceover: ${s.voiceover}
-  `).join("\n")}
+  1. Start Frame: The video MUST start exactly from the provided "Start Image".
+  2. Visual Continuity: Maintain the character, costume, and environment style from the "Reference Images".
+  3. Motion & Action: Describe the motion that follows the "Visual Direction" and "Voiceover" script, starting from the pose in the "Start Image".
+  4. Lip-Sync: If "Voiceover" is provided, explicitly describe the character's mouth moving to speak those words naturally.
   
   INSTRUCTIONS:
-  1. For each segment, guide the AI to follow the character and style in the reference images.
-  2. The prompts must be in English.
+  1. Analyze the "Start Image" (the first image) and the "Reference Images".
+  2. Create a 3-5 second motion description in English.
+  3. Focus on natural, high-fidelity movement.
   
-  OUTPUT:
-  - Return a JSON array of strings.
-  - Each string is a video prompt for the corresponding segment.`;
+  Return ONLY the prompt string.`;
 
   const getImageData = (img: string) => {
     const [header, data] = img.split(',');
@@ -891,33 +890,37 @@ export async function generateVideoPrompts(
     return { mimeType, data };
   };
 
-  // OPTIMIZATION: Compress and limit images to avoid token limit errors
+  // Combine Start Image (if exists) and Reference Images
+  const imagesToProcess = [];
+  if (segment.startImageUrl) {
+    imagesToProcess.push(segment.startImageUrl);
+  }
+  // Add some reference images for style
+  imagesToProcess.push(...referenceImages.slice(0, 3));
+
+  // OPTIMIZATION: Compress images
   const optimizedImages = await Promise.all(
-    referenceImages.slice(0, 10).map(img => compressImage(img, 512, 0.6))
+    imagesToProcess.map(img => compressImage(img, 512, 0.6))
   );
 
-  const imageParts = optimizedImages.map(img => {
+  const imageParts = optimizedImages.map((img, i) => {
     const { mimeType, data } = getImageData(img);
-    return { inlineData: { mimeType, data } };
-  });
+    // Label the first image as "Start Image" in the AI's mind if it's the segment's image
+    const textPrefix = i === 0 && segment.startImageUrl ? "Start Image: " : "Reference Image: ";
+    return [
+      { text: textPrefix },
+      { inlineData: { mimeType, data } }
+    ];
+  }).flat();
 
-  const contents = imageParts.length > 0 
-    ? { parts: [{ text: prompt }, ...imageParts] }
-    : prompt;
+  const contents = { parts: [{ text: prompt }, ...imageParts] };
 
   const response = await callGeminiWithRetry({
     model,
     contents,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING }
-      }
-    }
   });
 
-  return JSON.parse(extractTextFromResponse(response) || "[]");
+  return extractTextFromResponse(response) || "A cinematic scene following the script.";
 }
 
 export async function generateVideo(
