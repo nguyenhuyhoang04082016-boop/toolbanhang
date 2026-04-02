@@ -389,7 +389,7 @@ export async function generateAdScript(
   - Focus entirely on visual storytelling, background music, and sound effects (sfx).
   `}
   
-  - IMPORTANT: If a character image is provided, describe the specific person from that image.
+  - IMPORTANT: If a character image is provided, DO NOT describe the character's appearance (eyes, hair, face, etc.) in the visualDirection. Simply refer to them as "the character" or "the person" and state that they must strictly match the provided reference images.
   - The script must be seamless and natural.
   - Split the script into segments of exactly 8 seconds each.
   - MANDATORY: You MUST generate exactly ${Math.ceil((product.totalLength || 32) / 8)} segments.
@@ -580,7 +580,10 @@ export async function generateImagePrompts(
   
   CRITICAL: VISUAL CONSISTENCY
   - Follow the provided reference images for ALL visual elements (character, background, costume, accessories).
-  - DO NOT describe the character's appearance in detail; simply refer to the character in the reference images.
+  - DO NOT describe the character's appearance (eyes, hair, face, etc.) in the prompts.
+  - Simply refer to the character as "the character" or "the person" and state that they must strictly match the provided reference images.
+  - BAD EXAMPLE: "A young woman with long brown hair and blue eyes wearing a red dress standing in the kitchen."
+  - GOOD EXAMPLE: "The character from the reference images is standing in the kitchen, matching the style and environment of the reference images."
   - Product: ${productName}
   
   INSTRUCTIONS:
@@ -725,7 +728,7 @@ export async function generateImage(
       }
     });
     // Update prompt to emphasize consistency
-    parts[parts.length - 2].text += ". Maintain the exact same character, environment, and style as the provided reference image.";
+    parts[parts.length - 2].text += ". Maintain the exact same character, environment, and style as the provided reference image. DO NOT describe the character's appearance; just match the reference image exactly.";
   }
 
   const language = (typeof window !== 'undefined' ? localStorage.getItem('app_language') || 'vi' : 'vi') as Language;
@@ -745,6 +748,7 @@ export async function generateImage(
         parts,
       },
       config: {
+        systemInstruction: "You are an image generation expert. Your goal is to generate an image that strictly follows the provided reference images. DO NOT describe the character's appearance (eyes, hair, face, etc.) if a reference image is provided; simply ensure the character in the new image matches the reference image exactly.",
         imageConfig: {
           aspectRatio: aspectRatio,
           imageSize: "1K"
