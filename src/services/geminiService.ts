@@ -564,16 +564,19 @@ export async function generateImagePrompts(
   characterProfile: string,
   productName: string,
   referenceImages: string[] = []
-): Promise<string[]> {
+): Promise<{ startPrompt: string, endPrompt: string }[]> {
   // Check for Mock Mode
   const isMockMode = typeof window !== 'undefined' && localStorage.getItem('mock_mode') === 'true';
   if (isMockMode) {
-    return segments.map(() => "A beautiful product shot");
+    return segments.map(() => ({ 
+      startPrompt: "A beautiful product shot", 
+      endPrompt: "A dynamic product action shot" 
+    }));
   }
 
   const model = typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') || DEFAULT_MODEL : DEFAULT_MODEL;
   
-  const prompt = `Generate an image generation prompt for each ad segment.
+  const prompt = `Generate a START and END image generation prompt for each ad segment.
   
   CRITICAL: NO TEXT
   - DO NOT include any on-screen text, subtitles, captions, or overlays.
@@ -582,19 +585,17 @@ export async function generateImagePrompts(
   - Follow the provided reference images for ALL visual elements (character, background, costume, accessories).
   - DO NOT describe the character's appearance (eyes, hair, face, etc.) in the prompts.
   - Simply refer to the character as "the character" or "the person" and state that they must strictly match the provided reference images.
-  - BAD EXAMPLE: "A young woman with long brown hair and blue eyes wearing a red dress standing in the kitchen."
-  - GOOD EXAMPLE: "The character from the reference images is standing in the kitchen, matching the style and environment of the reference images."
   - Product: ${productName}
   
   INSTRUCTIONS:
-  1. For each segment, create a prompt describing the scene.
+  1. For each segment, create a START prompt (initial pose) and an END prompt (final pose after 3-5s of motion).
   2. The character, background, and style MUST match the provided reference images.
   3. The prompts must be in English.
   
   Segments:
   ${segments.map(s => `Segment ${s.index}: ${s.visualDirection}`).join("\n")}
   
-  Return a JSON array of strings, one for each segment. Focus on guiding the AI to follow the reference images.`;
+  Return a JSON array of objects, one for each segment: { "startPrompt": "...", "endPrompt": "..." }.`;
 
   const getImageData = (img: string) => {
     const [header, data] = img.split(',');
@@ -604,7 +605,7 @@ export async function generateImagePrompts(
 
   // OPTIMIZATION: Compress and limit images to avoid token limit errors
   const optimizedImages = await Promise.all(
-    referenceImages.slice(0, 10).map(img => compressImage(img, 512, 0.6))
+    referenceImages.slice(0, 5).map(img => compressImage(img, 512, 0.6))
   );
 
   const imageParts = optimizedImages.map(img => {
@@ -623,7 +624,14 @@ export async function generateImagePrompts(
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.ARRAY,
-        items: { type: Type.STRING }
+        items: { 
+          type: Type.OBJECT,
+          properties: {
+            startPrompt: { type: Type.STRING },
+            endPrompt: { type: Type.STRING }
+          },
+          required: ["startPrompt", "endPrompt"]
+        }
       }
     }
   });

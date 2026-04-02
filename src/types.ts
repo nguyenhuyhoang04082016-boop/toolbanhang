@@ -75,6 +75,8 @@ export interface AdSegment {
   sfx: string;
   cameraNotes?: string;
   imagePrompt?: string;
+  startImagePrompt?: string;
+  endImagePrompt?: string;
   startImageUrl?: string;
   endImageUrl?: string;
   videoUrl?: string;

@@ -7,7 +7,8 @@ import { useTranslation } from '../i18n';
 interface GenerationProgressTabProps {
   script: AdScript | null;
   progress: Record<string, { 
-    image: 'pending' | 'loading' | 'done' | 'error', 
+    startImage: 'pending' | 'loading' | 'done' | 'error', 
+    endImage: 'pending' | 'loading' | 'done' | 'error',
     video: 'pending' | 'loading' | 'done' | 'error',
     videoUrl?: string 
   }>;
@@ -28,7 +29,9 @@ export const GenerationProgressTab: React.FC<GenerationProgressTabProps> = ({
   if (!script) return null;
 
   const allDone = script.segments.every(s => 
-    progress[s.id]?.image === 'done' && progress[s.id]?.video === 'done'
+    progress[s.id]?.startImage === 'done' && 
+    progress[s.id]?.endImage === 'done' && 
+    progress[s.id]?.video === 'done'
   );
 
   return (
@@ -88,34 +91,67 @@ export const GenerationProgressTab: React.FC<GenerationProgressTabProps> = ({
                 </div>
 
                 <div className="flex items-center gap-8">
-                  {/* Image Generation Progress */}
+                  {/* Start Image Generation Progress */}
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg ${
-                      status.image === 'done' ? 'bg-emerald-100 text-emerald-600' :
-                      status.image === 'loading' ? 'bg-indigo-100 text-indigo-600' :
-                      status.image === 'error' ? 'bg-red-100 text-red-600' :
+                      status.startImage === 'done' ? 'bg-emerald-100 text-emerald-600' :
+                      status.startImage === 'loading' ? 'bg-indigo-100 text-indigo-600' :
+                      status.startImage === 'error' ? 'bg-red-100 text-red-600' :
                       'bg-zinc-100 text-zinc-400'
                     }`}>
                       <ImageIcon className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                        {language === 'vi' ? 'Hình ảnh' : 'Image'}
+                        {language === 'vi' ? 'Ảnh đầu' : 'Start Img'}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        {status.image === 'loading' && <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />}
-                        {status.image === 'done' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
-                        {status.image === 'error' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                        {status.startImage === 'loading' && <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />}
+                        {status.startImage === 'done' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                        {status.startImage === 'error' && <AlertCircle className="w-3 h-3 text-red-600" />}
                         <span className={`text-xs font-bold ${
-                          status.image === 'done' ? 'text-emerald-600' :
-                          status.image === 'loading' ? 'text-indigo-600' :
-                          status.image === 'error' ? 'text-red-600' :
+                          status.startImage === 'done' ? 'text-emerald-600' :
+                          status.startImage === 'loading' ? 'text-indigo-600' :
+                          status.startImage === 'error' ? 'text-red-600' :
                           'text-zinc-400'
                         }`}>
-                          {status.image === 'done' ? (language === 'vi' ? 'Hoàn tất' : 'Done') :
-                           status.image === 'loading' ? (language === 'vi' ? 'Đang tạo...' : 'Generating...') :
-                           status.image === 'error' ? (language === 'vi' ? 'Lỗi' : 'Error') :
-                           (language === 'vi' ? 'Chờ...' : 'Pending')}
+                          {status.startImage === 'done' ? (language === 'vi' ? 'Xong' : 'Done') :
+                           status.startImage === 'loading' ? (language === 'vi' ? '...' : '...') :
+                           status.startImage === 'error' ? (language === 'vi' ? 'Lỗi' : 'Err') :
+                           (language === 'vi' ? 'Chờ' : 'Wait')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* End Image Generation Progress */}
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      status.endImage === 'done' ? 'bg-emerald-100 text-emerald-600' :
+                      status.endImage === 'loading' ? 'bg-indigo-100 text-indigo-600' :
+                      status.endImage === 'error' ? 'bg-red-100 text-red-600' :
+                      'bg-zinc-100 text-zinc-400'
+                    }`}>
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        {language === 'vi' ? 'Ảnh cuối' : 'End Img'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {status.endImage === 'loading' && <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />}
+                        {status.endImage === 'done' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                        {status.endImage === 'error' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                        <span className={`text-xs font-bold ${
+                          status.endImage === 'done' ? 'text-emerald-600' :
+                          status.endImage === 'loading' ? 'text-indigo-600' :
+                          status.endImage === 'error' ? 'text-red-600' :
+                          'text-zinc-400'
+                        }`}>
+                          {status.endImage === 'done' ? (language === 'vi' ? 'Xong' : 'Done') :
+                           status.endImage === 'loading' ? (language === 'vi' ? '...' : '...') :
+                           status.endImage === 'error' ? (language === 'vi' ? 'Lỗi' : 'Err') :
+                           (language === 'vi' ? 'Chờ' : 'Wait')}
                         </span>
                       </div>
                     </div>

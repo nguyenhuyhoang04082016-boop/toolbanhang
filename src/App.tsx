@@ -41,7 +41,8 @@ export default function App() {
   const [isReviewingScript, setIsReviewingScript] = useState(false);
   const [isReviewingImages, setIsReviewingImages] = useState(false);
   const [segmentProgress, setSegmentProgress] = useState<Record<string, { 
-    image: 'pending' | 'loading' | 'done' | 'error', 
+    startImage: 'pending' | 'loading' | 'done' | 'error', 
+    endImage: 'pending' | 'loading' | 'done' | 'error',
     video: 'pending' | 'loading' | 'done' | 'error',
     videoUrl?: string 
   }>>({});
@@ -314,7 +315,11 @@ export default function App() {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: Date.now(),
         language,
-        segments: segments.map((s, i) => ({ ...s, imagePrompt: imagePrompts[i] || "" })),
+        segments: segments.map((s, i) => ({ 
+          ...s, 
+          startImagePrompt: imagePrompts[i]?.startPrompt || "",
+          endImagePrompt: imagePrompts[i]?.endPrompt || ""
+        })),
         seamlessScript,
         productAnalysis,
         productInfo: product,
@@ -336,29 +341,51 @@ export default function App() {
       setActiveTab('results'); // Switch to progress tab early
       setIsLoading(false); // Hide full-screen overlay to show progress tab
 
-      // 5. Generate Images for all segments
+      // 5. Generate START and END Images for all segments
       const segmentsWithImages = await Promise.all(finalScript.segments.map(async (segment) => {
         setSegmentProgress(prev => ({
           ...prev,
-          [segment.id]: { ...prev[segment.id], image: 'loading' }
+          [segment.id]: { 
+            ...prev[segment.id], 
+            startImage: 'loading',
+            endImage: 'loading'
+          }
         }));
         try {
+          // Generate Start Image
           const startImageUrl = await generateImage(
-            segment.imagePrompt, 
+            segment.startImagePrompt || "", 
             finalProduct.ratio === '9:16' ? '9:16' : '16:9',
             allImages,
             allImages[0]
           );
           setSegmentProgress(prev => ({
             ...prev,
-            [segment.id]: { ...prev[segment.id], image: 'done' }
+            [segment.id]: { ...prev[segment.id], startImage: 'done' }
           }));
-          return { ...segment, startImageUrl };
-        } catch (error) {
-          console.error(`Failed to generate image for segment ${segment.id}`, error);
+
+          // Generate End Image
+          const endImageUrl = await generateImage(
+            segment.endImagePrompt || "", 
+            finalProduct.ratio === '9:16' ? '9:16' : '16:9',
+            allImages,
+            startImageUrl // Use start image as reference for end image consistency
+          );
           setSegmentProgress(prev => ({
             ...prev,
-            [segment.id]: { ...prev[segment.id], image: 'error' }
+            [segment.id]: { ...prev[segment.id], endImage: 'done' }
+          }));
+
+          return { ...segment, startImageUrl, endImageUrl };
+        } catch (error) {
+          console.error(`Failed to generate images for segment ${segment.id}`, error);
+          setSegmentProgress(prev => ({
+            ...prev,
+            [segment.id]: { 
+              ...prev[segment.id], 
+              startImage: prev[segment.id]?.startImage === 'done' ? 'done' : 'error',
+              endImage: prev[segment.id]?.endImage === 'done' ? 'done' : 'error'
+            }
           }));
           return segment;
         }
@@ -386,7 +413,7 @@ export default function App() {
           const videoUrl = await generateVideo(
             videoPrompt,
             segment.startImageUrl,
-            undefined,
+            segment.endImageUrl,
             finalProduct.ratio === '9:16' ? '9:16' : '16:9'
           );
           
