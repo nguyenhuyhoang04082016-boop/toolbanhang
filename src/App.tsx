@@ -11,7 +11,7 @@ import {
   generateAdScript, 
   generateCharacterProfile, 
   generateImagePrompts, 
-  generateVideoPrompts, 
+  generateVideoPrompt, 
   inferScriptOrientation,
   generateImage,
   generateVideo,
@@ -372,25 +372,19 @@ export default function App() {
       setImageReview(imgReview);
       setIsReviewingImages(false);
       
-      // 7. Generate Video Prompts
-      const videoPrompts = await generateVideoPrompts(segmentsWithImages, characterProfile, product.name, allImages);
-      const segmentsWithVideoPrompts = segmentsWithImages.map((s, i) => ({
-        ...s,
-        videoPrompt: videoPrompts[i] || ""
-      }));
-      
-      finalScript = { ...finalScript, segments: segmentsWithVideoPrompts };
-      setCurrentScript(finalScript);
-
-      // 8. Generate Videos for all segments (Automated)
-      await Promise.all(finalScript.segments.map(async (segment) => {
+      // 7. Generate Video Prompts & Videos for all segments (Automated)
+      await Promise.all(segmentsWithImages.map(async (segment) => {
         setSegmentProgress(prev => ({
           ...prev,
           [segment.id]: { ...prev[segment.id], video: 'loading' }
         }));
         try {
+          // 7a. Generate specific video prompt for this segment using the generated image
+          const videoPrompt = await generateVideoPrompt(segment, characterProfile, finalProduct.name, allImages);
+          
+          // 7b. Generate Video
           const videoUrl = await generateVideo(
-            segment.videoPrompt,
+            videoPrompt,
             segment.startImageUrl,
             undefined,
             finalProduct.ratio === '9:16' ? '9:16' : '16:9'
@@ -406,7 +400,7 @@ export default function App() {
             if (!prev) return null;
             return {
               ...prev,
-              segments: prev.segments.map(s => s.id === segment.id ? { ...s, videoUrl } : s)
+              segments: prev.segments.map(s => s.id === segment.id ? { ...s, videoPrompt, videoUrl } : s)
             };
           });
         } catch (error) {
