@@ -362,7 +362,12 @@ export async function generateAdScript(
   4. DATA & CLEAR VISUALS (Đưa ra số liệu, hình ảnh rõ ràng): Instead of just talking, describe real scenes (e.g., printing orders, packing, revenue screenshots, happy faces). Use visual effects and text to emphasize important info.
   5. CLEAR CTA (Kết thúc bằng 1 CTA rõ ràng): Define exactly what the viewer should do (Buy, Share, Follow). Give them a logical reason to interact immediately.
   
-  STEP 3: GENERATE AD SCRIPT
+  STEP 3: PACING & DIALOGUE (USER PREFERENCE)
+  - FAST PACING: The action and visual changes in each segment MUST be fast-paced and dynamic.
+  - INCREASED DIALOGUE: Include more character dialogue or narration than usual.
+  - EVEN DISTRIBUTION: Ensure the dialogue is spread evenly across ALL segments. No segment should be silent or overly crowded compared to others.
+  
+  STEP 4: GENERATE AD SCRIPT
   Based on the analysis and user requirements, generate a high-converting, seamless ad script for Veo 3.
   - Ad Style: ${product.scriptOrientation?.style || product.videoType || 'lifestyle'}.
   - Dialogue Type: ${product.scriptOrientation?.dialogueType || 'self-talk'}.
@@ -875,7 +880,8 @@ export async function generateVideoPrompt(
   1. Start Frame: The video MUST start exactly from the provided "Start Image".
   2. Visual Continuity: Maintain the character, costume, and environment style from the "Reference Images".
   3. Motion & Action: Describe the motion that follows the "Visual Direction" and "Voiceover" script, starting from the pose in the "Start Image".
-  4. Lip-Sync: If "Voiceover" is provided, explicitly describe the character's mouth moving to speak those words naturally.
+  4. FAST PACING: The motion and actions described MUST be dynamic, energetic, and fast-paced.
+  5. Lip-Sync: If "Voiceover" is provided, explicitly describe the character's mouth moving to speak those words naturally.
   
   INSTRUCTIONS:
   1. Analyze the "Start Image" (the first image) and the "Reference Images".
